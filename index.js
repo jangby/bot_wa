@@ -117,22 +117,34 @@ client.on('message', async (msg) => {
         }
 
         else if (command === '!menu' || command === '!help') {
-            const menu = `*🤖 MENU BOT GRUP 🤖*
+            const menu = `*🤖 BUKU PANDUAN BOT GRUP 🤖*
 
-*👤 Untuk Semua Anggota:*
-• *!ping* : Cek status bot
-• *!menu* : Tampilkan daftar perintah ini
-• *!infogrup* : Info seputar grup
-• *!admin* : Tag semua admin grup
-• *!sticker* : Kirim gambar dengan caption !sticker untuk membuat stiker
+*👤 FITUR UMUM (Semua Anggota)*
+• *!ping* : Cek status keaktifan bot
+• *!menu* : Tampilkan pesan panduan ini
+• *!infogrup* : Lihat info detail grup
+• *!admin* : Panggil semua admin grup
+• *!sticker* : Buat stiker (Kirim/Reply foto dgn caption !sticker)
+• *!steks [teks]* : Buat stiker teks tebal (Contoh: *!steks Halo*)
+• *!vn* : Ubah MP3 jadi Voice Note (Reply file mp3 dgn !vn)
 
-*👑 Khusus Admin:*
-• *!tagall* : Mention semua anggota
-• *!kick @user* : Keluarkan anggota
-• *!promote @user* : Jadikan anggota sebagai admin
-• *!demote @user* : Turunkan admin jadi anggota biasa
-• *!tutupgrup* : Hanya admin yang bisa kirim pesan
-• *!bukagrup* : Semua anggota bisa kirim pesan`;
+*🎮 MINI GAME & EKONOMI*
+• *!saldo* : Cek jumlah poin & status VIP kamu
+• *!tebak [1-10] [taruhan]* : Main tebak angka (Contoh: *!tebak 7 50*)
+• *!belikebal* : Beli kekebalan anti-kick 24 Jam (Harga: 1000 Poin)
+
+*👑 MODERASI (Khusus Admin)*
+• *!tagall* : Mention semua anggota grup
+• *!kick @user* : Keluarkan anggota (Kecuali VIP)
+• *!promote @user* : Naikkan anggota jadi Admin
+• *!demote @user* : Turunkan Admin jadi anggota
+• *!tutupgrup* : Kunci grup (Hanya Admin yg bisa chat)
+• *!bukagrup* : Buka grup (Semua bisa chat)
+• *!blacklist @user* : Hapus pesan orang ini secara otomatis
+• *!bukablacklist @user* : Cabut hukuman blacklist
+• *!off* : Matikan bot sementara di grup ini
+• *!on* : Nyalakan kembali bot di grup ini`;
+
             msg.reply(menu);
         }
 
