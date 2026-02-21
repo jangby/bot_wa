@@ -311,7 +311,7 @@ client.on('message', async (msg) => {
         // ==========================================
 
         // Mengelompokkan perintah admin untuk dicek otoritasnya sekaligus
-        else if (['!tagall', '!kick', '!promote', '!demote', '!tutupgrup', '!bukagrup', '!blacklist', '!bukablacklist', '!on', '!off'].includes(command)) {
+        else if (['!tagall', '!kick', '!promote', '!demote', '!tutupgrup', '!bukagrup', '!blacklist', '!bukablacklist', '!on', '!off', '!zoom'].includes(command)) {
             
             // Jika yang mengirim BUKAN admin, tolak!
             if (!isSenderAdmin) {
@@ -427,6 +427,31 @@ client.on('message', async (msg) => {
                     msg.reply('⚠️ Mohon tag orangnya. Contoh: *!bukablacklist @Budi*');
                 }
             }
+
+            // ==========================================
+        // 🎥 FITUR BUAT RUANG RAPAT ONLINE (!zoom / !meet)
+        // ==========================================
+        else if (command === '!zoom' || command === '!meet') {
+            
+            // Opsional: Hapus 3 baris di bawah ini jika Anda ingin SEMUA ANGGOTA bisa memakai perintah ini
+            if (!isSenderAdmin) {
+                return msg.reply('❌ Maaf, hanya Admin yang bisa membuat ruang rapat.');
+            }
+
+            msg.reply('⏳ Sedang menyiapkan ruang rapat online...');
+
+            // Membuat kode acak (kombinasi angka dan huruf) agar ruang rapat tidak bentrok dengan orang lain
+            const randomCode = Math.random().toString(36).substring(2, 10);
+            
+            // Membentuk URL Jitsi Meet
+            // Anda bisa mengganti kata "RapatGrup" dengan nama pondok/grup Anda
+            const meetLink = `https://meet.jit.si/RapatGrup-${randomCode}`;
+
+            const pesanRapat = `🎥 *UNDANGAN RAPAT ONLINE* 🎥\n\nRuang rapat telah berhasil dibuat! \nSilakan klik tautan di bawah ini untuk langsung bergabung (Tidak perlu login/daftar):\n\n🔗 ${meetLink}\n\n_Catatan: Jika ditanya, izinkan akses mikrofon dan kamera Anda._`;
+
+            // Mengirimkan link ke grup
+            msg.reply(pesanRapat);
+        }
 
             // FITUR MATIKAN BOT
             else if (command === '!off') {
