@@ -10,6 +10,8 @@ let catatanGrup = {};
 const googleTTS = require('google-tts-api'); // Modul untuk Text-to-Speech
 const kumpulanQuotes = require('./quotes.js');
 const bankSoal = require('./bankSoal.js'); // Memanggil bank soal kuis
+const os = require('os'); // Modul bawaan untuk info sistem
+const startTime = new Date(); // Mencatat waktu bot pertama kali dijalankan
 
 let sesiAbsen = {};
 const daftarKataKasar = [
@@ -50,6 +52,14 @@ function getPlayer(id) {
         playersData[id] = { points: 100, kebalUntil: 0 }; 
     }
     return playersData[id];
+}
+
+function formatUptime(seconds) {
+    const d = Math.floor(seconds / (3600 * 24));
+    const h = Math.floor(seconds % (3600 * 24) / 3600);
+    const m = Math.floor(seconds % 3600 / 60);
+    const s = Math.floor(seconds % 60);
+    return `${d} Hari, ${h} Jam, ${m} Menit, ${s} Detik`;
 }
 
 const client = new Client({
@@ -212,7 +222,18 @@ client.on('message', async (msg) => {
         }
 
         if (command === '!ping') {
-            msg.reply('Pong! Bot aktif dan siap melayani.');
+            const uptimeServer = formatUptime(os.uptime()); // Durasi VPS menyala
+            const uptimeBot = formatUptime((new Date() - startTime) / 1000); // Durasi Bot menyala
+            const sejakKapan = startTime.toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' }); // Waktu mulai bot
+
+            msg.reply(`🏓 *PONG! BOT AKTIF*
+
+🖥️ *Info Server:*
+• *Uptime VPS:* ${uptimeServer}
+• *Uptime Bot:* ${uptimeBot}
+• *Aktif Sejak:* ${sejakKapan} WIB
+
+_Bot siap melayani grup ini!_`);
         }
 
         else if (command === '!menu' || command === '!help') {
