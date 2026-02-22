@@ -15,27 +15,125 @@ const startTime = new Date(); // Mencatat waktu bot pertama kali dijalankan
 const { exec } = require('child_process');
 const fs = require('fs');
 const sudoUsers = [
-    '6285136468097@c.us'
+    '6285136468097@c.us',
+    '6285182484981@c.us'
 ];
 let disabledFeatures = [];
 let ttsCooldowns = {};
 let ultahData = {};
 let kasData = {};
 const daftarKhodam = [
-    "Kipas Angin Rusak (Suka bikin orang kepanasan emosi)",
-    "Naga Sakti (Suka tidur siang, bangun-bangun makan banyak)",
-    "Knalpot Racing (Berisik banget kalau lagi ngumpul)",
+    // --- HEWAN & MAKHLUK AJAIB ---
     "Macan Cisewu (Keliatannya garang tapi aslinya gemesin)",
-    "Sapu Lidi (Suka ngumpulin temen-temen buat nongkrong)",
-    "Ceker Ayam (Suka jalan-jalan ga jelas arahnya)",
+    "Naga Sakti (Suka tidur siang, bangun-bangun makan banyak)",
+    "Kucing Oyen (Barbar, suka nyari ribut tapi disayang)",
+    "Cicak Kesedak (Suka ngeliatin orang dari pojokan ruangan)",
+    "Nyamuk DBD (Kecil-kecil cabe rawit, diam-diam mematikan)",
+    "Tikus Got Berotot (Pintar nyari jalan keluar kalau lagi kepepet)",
+    "Kecoa Terbang (Sekalinya bergerak bikin satu tongkrongan panik)",
+    "Semut Rangrang (Suka gotong royong nyari makanan gratisan)",
+    "Kupu-kupu Malam (Jam tidurnya berantakan, aktif pas orang lain tidur)",
+    "Burung Gereja Nyasar (Suka ikut nimbrung obrolan padahal ga nyambung)",
+    "Lintah Darat (Suka nagih janji dengan kejam tak kenal ampun)",
+    "Kucing Garong (Suka minta jatah makan temen secara paksa)",
+    "Biawak Plafon (Diam-diam merayap, tau-tau jatuh bikin kaget)",
+    "Ular Sanca (Suka melilit dan mepet kalau lagi butuh pinjeman duit)",
+    "Kuda Lumping (Kalau lagi emosi bawaannya pengen makan beling)",
+    "Lele Terbang (Punya cita-cita tinggi meski kelihatan mustahil)",
+    "Buaya Darat (Mulutnya manis banget, tapi janjinya palsu semua)",
+    "Bebek Ngesot (Jalannya lambat banget kalau janjian ngumpul)",
+    "Ayam Jago (Suka bangunin orang pagi-pagi tapi dianya tidur lagi)",
+    "Monyet Sirkus (Banyak akal dan paling jago menghibur temen yang lagi sedih)",
+    "Pinguin Kutub (Suka ngeluh kepanasan mulu kalau siang)",
+    "Singa Podium (Kalau ngomong suaranya paling kenceng di tongkrongan)",
+    "Gajah Duduk (Kalau udah asik nongkrong paling susah disuruh pulang)",
+    "Undur-undur (Kalau ditagih tugas atau utang jalannya mundur)",
+    "Burung Hantu (Mata melek terus kalau malem, pas pagi tepar)",
+    "Ikan Sapu-sapu (Tukang bersih-bersih makanan sisa temen di meja)",
+    "Tupai Loncat (Suka pindah-pindah circle tongkrongan)",
+    "Kura-kura Ninja (Suka bawa tas punggung gede banget ke mana-mana)",
+    "Beruang Madu (Suka banget makanan manis, ga peduli dompet nipis)",
+    "Kelinci Percobaan (Selalu jadi tumbal pertama kalau ada masalah)",
+    "Kuda Nil (Buka mulut lebar-lebar kalau lagi nguap ga pernah ditutup)",
+    "Harimau Sumatera (Keliatannya langka, jarang banget nongol di grup)",
+
+    // --- BARANG & BENDA SEHARI-HARI ---
+    "Kipas Angin Rusak (Suka bikin orang kepanasan emosi)",
+    "Knalpot Racing (Berisik banget kalau lagi ngumpul)",
+    "Sapu Lidi (Suka ngumpulin temen-temen buat nongkrong bareng)",
     "Guling Lecek (Selalu dicari kalau temen lagi butuh sandaran)",
-    "Kalkulator Rusak (Suka perhitungan tapi sering salah)",
-    "Powerbank (Penyelamat temen di saat genting)",
-    "Kopi Sachet (Murah senyum dan merakyat)"
+    "Kalkulator Rusak (Suka perhitungan sama temen tapi sering salah hitung)",
+    "Powerbank Kembung (Penyelamat temen di saat genting meski kondisinya memprihatinkan)",
+    "Tupperware Emak (Punya harga diri tinggi, sekali ilang bikin gempar satu rumah)",
+    "Charger Putus Ujungnya (Harus diposisikan miring dulu baru bisa kerja)",
+    "Sendal Swallow Kiri Semua (Sering bikin orang bingung dan emosi)",
+    "Helm Bogo Kaca Gelap (Suka pura-pura ga liat kalau ada yang nagih utang)",
+    "Motor Beat Karbu (Kerjanya ngabisin duit tapi setia nemenin ke mana aja)",
+    "Tipe-X Habis (Selalu dikocok-kocok doang tapi ga keluar hasilnya)",
+    "Spidol Papan Tulis Kering (Banyak gaya doang tapi aslinya ga ada isinya)",
+    "Karet Gelang Nasi Padang (Fleksibel banget, bisa menyesuaikan diri di segala situasi)",
+    "Jas Hujan Ponco Tiga Ribuan (Cuma bisa menutupi sedikit kekuranganmu)",
+    "Ban Motor Bocor Halus (Bikin orang darah tinggi secara perlahan)",
+    "Layar HP Retak Laba-laba (Penuh luka masa lalu tapi tetap memaksakan untuk bertahan)",
+    "Panci Gosong (Pekerja keras yang sering tidak dihargai karyanya)",
+    "Galon Aqua Berat (Beban keluarga tapi kehadirannya sangat dibutuhkan)",
+    "Remot TV Hilang (Suka nyelip pas dicari, muncul pas ga dibutuhin)",
+    "Colokan Terminal Penuh (Banyak nampung beban pikiran teman-temannya)",
+    "Baterai Jam Dinding Habis (Berhenti bergerak, males ngapa-ngapain)",
+    "Jaket Parasut Panas (Kelihatannya keren tapi aslinya bikin gerah)",
+    "Karcis Parkir Hilang (Suka bikin panik temen di saat-saat terakhir)",
+    "Permen Karet di Bangku (Suka nempel dan bikin risih orang di sekitarnya)",
+    "Alarm Subuh Mati (Selalu telat dengan seribu satu macam alasan)",
+    "Bantal Penuh Iler (Tempat curhat paling nyaman dan menyimpan banyak rahasia gelap)",
+    "Kipas Angin Muter Terus (Pusing sendiri mikirin hidup tapi tetep harus jalan)",
+    "AC Bocor NeteS (Suka menangis diam-diam di tengah malam)",
+    "Sikat Gigi Mekar (Udah lelah dengan kehidupan tapi tetep dipaksa kerja)",
+    "Sabun Mandi Tinggal Secuil (Berusaha bertahan hidup meski udah di ujung tanduk)",
+    "Odol Digulung Maksimal (Suka memaksakan keadaan walau udah mentok)",
+    "Sampo Ditambahin Air (Penuh trik licik dan cerdik buat bertahan hidup)",
+    "Handuk Basah Bau Apek (Kehadirannya suka bikin mood orang rusak)",
+    "Jemuran Lupa Diangkat (Suka bikin kerjaan orang lain jadi dua kali lipat)",
+    "Setrikaan Panas Sebelah (Emosinya labil, kadang baik kadang ngamuk ga jelas)",
+    "Tali Sepatu Ruwet (Jalan hidupnya selalu dipenuhi rintangan dan ribet sendiri)",
+    "Resleting Tas Jebol (Mulutnya bocor, ga bisa disimpenin rahasia sama sekali)",
+    "Dompet Kosong Kering (Sering pura-pura amnesia kalau diajak nongkrong bayar sendiri)",
+    "Headset Mati Sebelah (Pendengarannya selektif, cuma denger hal yang dia mau denger aja)",
+    "Mouse Warnet Lengket (Menyimpan banyak dosa masa lalu yang tak termaafkan)",
+    "Keyboard Ilang Tombol W (Gak bisa move on maju ke depan, stuck di masa lalu)",
+    "Flashdisk Kena Virus (Suka nyebarin gosip dan hoax di grup WhatsApp)",
+    "Kaos Kaki Sebelah (Selalu merasa galau karena kehilangan separuh jiwanya)",
+
+    // --- MAKANAN & MINUMAN ---
+    "Ceker Ayam (Suka jalan-jalan ga jelas arahnya mau ke mana)",
+    "Kopi Sachet (Murah senyum, merakyat, dan gampang membaur)",
+    "Seblak Bantet (Pedas omongannya tapi bikin orang kangen)",
+    "Gorengan Dingin (Asik di awal doang, tapi alot di akhir)",
+    "Es Krim Walls Jatuh (Selalu membawa kesedihan dan penyesalan mendalam bagi yang melihat)",
+    "Nasi Kuning Kering (Garing, kalau ngasih candaan sering krik krik krik)",
+    "Kerupuk Melempem (Kurang semangat hidup, gampang nyerah sebelum berjuang)",
+    "Sambal Pecel Lele (Pedasnya nampol, kalau ngomong suka nyelekit di hati)",
+    "Sate Ayam Keras (Susah dibilangin, keras kepala tingkat dewa)",
+    "Teh Pucuk Hangat (Kehadirannya bisa menenangkan suasana yang lagi tegang)",
+    "Es Teh Plastik Karet Dua (Murah meriah, disukai semua kalangan tongkrongan)",
+    "Bakwan Jagung (Suka nyempil di antara obrolan teman-temannya)",
+
+    // --- DUNIA SEKOLAH / WARNET / GEN Z ---
+    "Wi-Fi Indihome (Sering ngilang pas lagi dibutuhin banget)",
+    "Pulpen Snowman (Suka pindah tangan dan ga pernah balik ke pemilik aslinya)",
+    "Sinyal EDGE (Lambat banget kalau disuruh ngerjain sesuatu)",
+    "Pagar Sekolah Bolong (Suka ngasih jalan pintas/ide licik buat temen-temennya)",
+    "Bel Sekolah Rusak (Sering ngasih harapan palsu buat pulang cepet)",
+    "Buku LKS Kosong (Keliatannya doang rajin nulis, aslinya nyontek temen)",
+    "Celana Seragam Cingkrang (Suka melanggar aturan diam-diam dari belakang)",
+    "Kemeja OSIS Kebesaran (Suka bawa-bawa nama organisasi atau orang dalem buat caper)",
+    "Jam Kosong (Kehadirannya selalu dinantikan semua orang tanpa terkecuali)",
+    "Tukang Parkir Gaib (Pas datang gada, pas mau pulang tiba-tiba nongol minta jatah)",
+    "Kuota Malam Jam 12 (Cuma aktif dan ngegas kalau udah tengah malam)",
+    "Kutu Buku (Keliatannya aja pinter padahal sering nanya jawaban juga)"
 ];
 
 // GANTI INI DENGAN ID GRUP ANGKATANMU NANTI (Cara ceknya ada di Langkah 4)
-const ID_GRUP_ANGKATAN = "1234567890@g.us";
+const ID_GRUP_ANGKATAN = "120363211447635334@g.us";
 
 let sesiAbsen = {};
 let daftarKataKasar = [
