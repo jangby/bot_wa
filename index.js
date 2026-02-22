@@ -17,6 +17,7 @@ const fs = require('fs');
 const sudoUsers = [
     '6285136468097@c.us'
 ];
+let disabledFeatures = [];
 
 let sesiAbsen = {};
 let daftarKataKasar = [
@@ -115,8 +116,8 @@ client.on('message', async (msg) => {
         // ==========================================
         const teksPesanLower = msg.body.toLowerCase();
 
-        // 1. Eksekusi Anti-Link Grup Lain
-        if (teksPesanLower.includes('chat.whatsapp.com/')) {
+        // 1. Eksekusi Anti-Link Grup Lain (Cek apakah antilink tidak di-disable)
+        if (teksPesanLower.includes('chat.whatsapp.com/') && !disabledFeatures.includes('antilink')) {
             if (isBotAdmin && !isSenderAdmin) {
                 try {
                     await msg.delete(true);
@@ -138,11 +139,10 @@ client.on('message', async (msg) => {
 
         const terdeteksiKasar = daftarKataKasar.some(kata => teksNormal.includes(kata));
 
-        if (terdeteksiKasar) {
+        // Cek apakah fitur antikasar tidak di-disable
+        if (terdeteksiKasar && !disabledFeatures.includes('antikasar')) {
             console.log(`[LOG KATA KASAR] Terdeteksi dari: ${senderNumber} | isSenderAdmin: ${isSenderAdmin}`);
             
-            // HANYA CEK isBotAdmin. 
-            // Bot akan menghapus pesan selama bot tersebut adalah Admin, tidak peduli pengirimnya Admin atau bukan.
             if (isBotAdmin) {
                 try {
                     await msg.delete(true);
@@ -178,6 +178,14 @@ client.on('message', async (msg) => {
         // (Lanjutkan kode Anda seperti biasa mulai dari sini ke bawah...)
         const args = msg.body.trim().split(/ +/);
         const command = args.shift().toLowerCase();
+
+        // ==========================================
+        // 🛑 SISTEM PENGECEKAN FITUR DIMATIKAN
+        // ==========================================
+        // Jika command yang diketik ada di daftar fitur mati, bot akan diam (kecuali perintah !fitur itu sendiri)
+        if (disabledFeatures.includes(command) && command !== '!fitur') {
+            return; 
+        }
 
         // ==========================================
         // 🛑 SISTEM ON / OFF BOT 
@@ -242,6 +250,32 @@ client.on('message', async (msg) => {
 • *Aktif Sejak:* ${sejakKapan} WIB
 
 _Bot siap melayani grup ini!_`);
+        }
+
+        else if (command === '!fitur') {
+            // Validasi: Hanya Sudo / Owner yang bisa menggunakan perintah ini
+            if (!isSudo) {
+                return msg.reply('❌ Maaf, perintah ini HANYA bisa digunakan oleh Owner bot!');
+            }
+            
+            if (args.length < 2) {
+                return msg.reply('❌ Format salah!\nCara pakai: *!fitur [nama_perintah/fitur] [on/off]*\n\n*Contoh mematikan perintah:* \n!fitur !tts off\n!fitur !quran off\n\n*Contoh mematikan auto-moderator:*\n!fitur antilink off\n!fitur antikasar off');
+            }
+
+            const targetFeature = args[0].toLowerCase();
+            const action = args[1].toLowerCase();
+
+            if (action === 'off') {
+                if (!disabledFeatures.includes(targetFeature)) {
+                    disabledFeatures.push(targetFeature);
+                }
+                msg.reply(`✅ Sistem: Fitur *${targetFeature}* berhasil DIMATIKAN secara global.`);
+            } else if (action === 'on') {
+                disabledFeatures = disabledFeatures.filter(f => f !== targetFeature);
+                msg.reply(`✅ Sistem: Fitur *${targetFeature}* berhasil DIAKTIFKAN kembali.`);
+            } else {
+                msg.reply('❌ Argumen tidak valid! Gunakan "on" atau "off".');
+            }
         }
 
         else if (command === '!menu' || command === '!help') {
