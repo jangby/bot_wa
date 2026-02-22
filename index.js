@@ -472,7 +472,6 @@ _Bot siap melayani grup ini!_`);
             if (!chat.isGroup) return msg.reply('❌ Fitur ini hanya untuk di grup!');
             if (!isSenderAdmin && !isSudo) return msg.reply('❌ Hanya Admin Grup yang bisa memberikan gelar ke anggota!');
             
-            // Perbaikan: Menggunakan mentionedIds yang lebih cepat dan anti-error
             if (msg.mentionedIds.length === 0) return msg.reply('❌ Tag orang yang mau dikasih gelar!\nContoh: *!setgelar @Budi Duta Wacana*');
             
             const targetId = msg.mentionedIds[0];
@@ -485,7 +484,9 @@ _Bot siap melayani grup ini!_`);
             if (!gelar) return msg.reply('❌ Masukkan nama gelarnya!\nContoh: *!setgelar @Budi Duta Wacana*');
 
             gelarAngkatan[targetId] = gelar;
-            msg.reply(`🏆 Sah! *@${targetUser}* sekarang resmi dinobatkan sebagai:\n*${gelar}*`, { mentions: [targetId] });
+            
+            // PERBAIKAN: Menggunakan chat.sendMessage agar mention tidak error
+            await chat.sendMessage(`🏆 Sah! *@${targetUser}* sekarang resmi dinobatkan sebagai:\n*${gelar}*`, { mentions: [targetId] });
         }
         else if (command === '!gelar') {
             if (!chat.isGroup) return msg.reply('❌ Fitur ini hanya untuk di grup!');
@@ -501,10 +502,10 @@ _Bot siap melayani grup ini!_`);
             const gelar = gelarAngkatan[targetId];
 
             if (!gelar) {
-                return msg.reply(`Belum ada gelar untuk *@${targetUser}*. Kasihan banget cuma jadi NPC di grup ini.`, { mentions: [targetId] });
+                return chat.sendMessage(`Belum ada gelar untuk *@${targetUser}*. Kasihan banget cuma jadi NPC di grup ini.`, { mentions: [targetId] });
             }
 
-            msg.reply(`🏆 *AWARDS ANGKATAN* 🏆\n\nNama: *@${targetUser}*\nGelar Kehormatan: *${gelar}*`, { mentions: [targetId] });
+            await chat.sendMessage(`🏆 *AWARDS ANGKATAN* 🏆\n\nNama: *@${targetUser}*\nGelar Kehormatan: *${gelar}*`, { mentions: [targetId] });
         }
 
         // ==========================================
@@ -535,7 +536,8 @@ _Bot siap melayani grup ini!_`);
             else if (persentase < 80) komentar = "_Agak meresahkan ya, tolong dikondisikan!_";
             else komentar = "_Parah banget! Ini sih udah mendarah daging!_";
 
-            msg.reply(`📊 *CEK SEBERAPA ${sifat.toUpperCase()}* 📊\n\nTingkat *${sifat}* dari *@${targetUser}* adalah: *${persentase}%*!\n\n${komentar}`, { mentions: [targetId] });
+            // PERBAIKAN: Menggunakan chat.sendMessage agar mention tidak error
+            await chat.sendMessage(`📊 *CEK SEBERAPA ${sifat.toUpperCase()}* 📊\n\nTingkat *${sifat}* dari *@${targetUser}* adalah: *${persentase}%*!\n\n${komentar}`, { mentions: [targetId] });
         }
 
         // ==========================================
