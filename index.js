@@ -106,25 +106,28 @@ client.on('message', async (msg) => {
             }
         }
 
-        // 2. Eksekusi Filter Kata Kasar
+        // ==========================================
+        // 2. Eksekusi Filter Kata Kasar (Versi Cerdas & Adil)
+        // ==========================================
         let teksNormal = teksPesanLower
             .replace(/[4@]/g, 'a')
             .replace(/[1!]/g, 'i')
             .replace(/[3]/g, 'e')
             .replace(/[0]/g, 'o')
             .replace(/[5$]/g, 's')
-            .replace(/[^a-z]/g, ''); // Menghapus semua simbol pemisah (misal b.a.b.i jadi babi)
+            .replace(/[^a-z]/g, '');
 
-        // Mengecek apakah teks yang sudah dinormalkan mengandung kata di daftar
         const terdeteksiKasar = daftarKataKasar.some(kata => teksNormal.includes(kata));
 
         if (terdeteksiKasar) {
-            console.log(`[LOG KATA KASAR] Terdeteksi dari: ${senderNumber}`);
+            console.log(`[LOG KATA KASAR] Terdeteksi dari: ${senderNumber} | isSenderAdmin: ${isSenderAdmin}`);
             
-            if (isBotAdmin && !isSenderAdmin) {
+            // HANYA CEK isBotAdmin. 
+            // Bot akan menghapus pesan selama bot tersebut adalah Admin, tidak peduli pengirimnya Admin atau bukan.
+            if (isBotAdmin) {
                 try {
                     await msg.delete(true);
-                    await chat.sendMessage(`⚠️ *@${senderContact.id.user}*, peringatan! Sistem mendeteksi penggunaan kata tidak pantas. Harap jaga adab dan ketikan di grup ini.`, { mentions: [senderContact.id._serialized] });
+                    await chat.sendMessage(`⚠️ *@${senderContact.id.user}*, peringatan! Sistem mendeteksi penggunaan kata tidak pantas. Harap jaga adab dan ketikan di grup ini, meskipun Anda seorang Admin.`, { mentions: [senderContact.id._serialized] });
                     return; 
                 } catch (e) { 
                     console.log('Gagal hapus kata kasar:', e); 
