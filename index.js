@@ -19,6 +19,23 @@ const sudoUsers = [
 ];
 let disabledFeatures = [];
 let ttsCooldowns = {};
+let ultahData = {};
+let kasData = {};
+const daftarKhodam = [
+    "Kipas Angin Rusak (Suka bikin orang kepanasan emosi)",
+    "Naga Sakti (Suka tidur siang, bangun-bangun makan banyak)",
+    "Knalpot Racing (Berisik banget kalau lagi ngumpul)",
+    "Macan Cisewu (Keliatannya garang tapi aslinya gemesin)",
+    "Sapu Lidi (Suka ngumpulin temen-temen buat nongkrong)",
+    "Ceker Ayam (Suka jalan-jalan ga jelas arahnya)",
+    "Guling Lecek (Selalu dicari kalau temen lagi butuh sandaran)",
+    "Kalkulator Rusak (Suka perhitungan tapi sering salah)",
+    "Powerbank (Penyelamat temen di saat genting)",
+    "Kopi Sachet (Murah senyum dan merakyat)"
+];
+
+// GANTI INI DENGAN ID GRUP ANGKATANMU NANTI (Cara ceknya ada di Langkah 4)
+const ID_GRUP_ANGKATAN = "1234567890@g.us";
 
 let sesiAbsen = {};
 let daftarKataKasar = [
@@ -96,8 +113,11 @@ client.on('message', async (msg) => {
     const isPrivateChat = !chat.isGroup;
     const isSudo = sudoUsers.includes(standardSenderId);
 
-    // Bot merespons jika: di dalam grup ATAU (di chat pribadi DAN pengirimnya adalah Owner)
-    if (chat.isGroup || (isPrivateChat && isSudo)) {
+    // Deteksi apakah ini pesan menfess dari chat pribadi
+    const isMenfess = isPrivateChat && msg.body.toLowerCase().startsWith('!menfess');
+
+    // Bot merespons jika: di grup, di japri oleh Owner, ATAU ada yang mengirim !menfess di japri
+    if (chat.isGroup || (isPrivateChat && isSudo) || isMenfess) {
         const participants = chat.isGroup ? chat.participants : [];
         
         let isBotAdmin = false;
@@ -251,6 +271,146 @@ client.on('message', async (msg) => {
 • *Aktif Sejak:* ${sejakKapan} WIB
 
 _Bot siap melayani grup ini!_`);
+        }
+
+        // ==========================================
+        // 👻 FITUR CEK KHODAM
+        // ==========================================
+        else if (command === '!cekkhodam' || command === '!khodam') {
+            // Jika ada nama yang diketik, gunakan itu. Jika tidak, gunakan nama profil WA nya
+            const nama = args.length > 0 ? args.join(' ') : senderContact.pushname || "Kamu";
+            const randomKhodam = daftarKhodam[Math.floor(Math.random() * daftarKhodam.length)];
+            
+            msg.reply(`🔍 *HASIL TERAWANG KHODAM*\n\nNama: *${nama}*\nKhodam Pendamping: *${randomKhodam}*`);
+        }
+
+        // ==========================================
+        // 🎯 FITUR RANDOM TAG / SIAPA
+        // ==========================================
+        else if (command === '!siapa') {
+            if (!chat.isGroup) return msg.reply('❌ Fitur ini hanya bisa digunakan di dalam grup!');
+            if (args.length === 0) return msg.reply('❌ Masukkan pertanyaannya!\nContoh: *!siapa yang paling sering telat?*');
+
+            const pertanyaan = args.join(' ');
+            
+            // Ambil semua member grup kecuali bot itu sendiri
+            const members = participants.filter(p => p.id._serialized !== client.info.wid._serialized);
+            const randomMember = members[Math.floor(Math.random() * members.length)];
+
+            await chat.sendMessage(`🎯 *PERTANYAAN:* ${pertanyaan}\n\n🤖 Menurut penerawangan AI Bot, orangnya adalah... @${randomMember.id.user} !`, {
+                mentions: [randomMember.id._serialized]
+            });
+        }
+
+        // ==========================================
+        // 🎂 FITUR KALENDER ULANG TAHUN
+        // ==========================================
+        else if (command === '!setultah') {
+            if (args.length === 0) return msg.reply('❌ Format salah!\nCara pakai: *!setultah DD-MM*\nContoh: *!setultah 15-08* (Untuk 15 Agustus)');
+            
+            const tanggal = args[0];
+            if (!/^\d{2}-\d{2}$/.test(tanggal)) return msg.reply('❌ Format tanggal harus DD-MM (Contoh: 15-08)');
+
+            const nama = senderContact.pushname || senderNumber;
+            ultahData[standardSenderId] = { nama: nama, tanggal: tanggal };
+            msg.reply(`🎂 Ulang tahun kamu (*${tanggal}*) berhasil disimpan di memori bot!`);
+        }
+        else if (command === '!ultah') {
+            if (Object.keys(ultahData).length === 0) return msg.reply('📭 Belum ada data ulang tahun yang disimpan.\nKetik *!setultah DD-MM* untuk mendaftar.');
+            
+            // Mengambil bulan saat ini (misal Agustus = "08")
+            const bulanIni = ("0" + (new Date().getMonth() + 1)).slice(-2);
+            let daftar = `🎂 *YANG ULANG TAHUN BULAN INI (${bulanIni})* 🎂\n\n`;
+            let ada = false;
+
+            for (const id in ultahData) {
+                const data = ultahData[id];
+                const bulanUltah = data.tanggal.split('-')[1]; // Mengambil angka bulannya saja
+                if (bulanUltah === bulanIni) {
+                    daftar += `- ${data.nama} (*${data.tanggal}*)\n`;
+                    ada = true;
+                }
+            }
+
+            if (!ada) daftar += "_Tidak ada teman angkatan yang berulang tahun di bulan ini._";
+            msg.reply(daftar);
+        }
+
+        // ==========================================
+        // 💰 FITUR BUKU KAS ANGKATAN
+        // ==========================================
+        else if (command === '!kas') {
+            if (!chat.isGroup) return msg.reply('❌ Fitur ini hanya bisa digunakan di grup.');
+            const groupId = chat.id._serialized;
+            
+            if (!kasData[groupId]) {
+                kasData[groupId] = { total: 0, history: [] }; // Buat buku kas baru jika belum ada
+            }
+
+            const aksi = args[0] ? args[0].toLowerCase() : '';
+            
+            if (aksi === 'tambah' || aksi === 'kurang') {
+                if (!isSenderAdmin && !isSudo) return msg.reply('❌ Hanya Admin Grup yang bisa mengubah saldo kas!');
+                if (args.length < 3) return msg.reply(`❌ Format salah!\nContoh: *!kas ${aksi} 50000 dari Doni*`);
+
+                const nominal = parseInt(args[1]);
+                if (isNaN(nominal) || nominal <= 0) return msg.reply('❌ Nominal harus berupa angka yang valid!');
+
+                const keterangan = args.slice(2).join(' ');
+                
+                if (aksi === 'tambah') {
+                    kasData[groupId].total += nominal;
+                    kasData[groupId].history.push(`[+] Rp ${nominal} (${keterangan})`);
+                    msg.reply(`✅ Saldo kas berhasil *ditambah Rp ${nominal}*\nKeterangan: ${keterangan}\n💰 Total Saldo: *Rp ${kasData[groupId].total}*`);
+                } else {
+                    if (kasData[groupId].total < nominal) return msg.reply(`❌ Saldo kas tidak cukup! Saldo saat ini: *Rp ${kasData[groupId].total}*`);
+                    kasData[groupId].total -= nominal;
+                    kasData[groupId].history.push(`[-] Rp ${nominal} (${keterangan})`);
+                    msg.reply(`✅ Saldo kas berhasil *dikurangi Rp ${nominal}*\nKeterangan: ${keterangan}\n💰 Total Saldo: *Rp ${kasData[groupId].total}*`);
+                }
+            } else {
+                // Tampilkan Info Kas Jika Hanya Mengetik !kas
+                let info = `💼 *BUKU KAS ANGKATAN* 💼\n\n💰 *Total Saldo Saat Ini:* Rp ${kasData[groupId].total}\n\n*Catatan Terakhir:*\n`;
+                if (kasData[groupId].history.length === 0) {
+                    info += "_Belum ada riwayat pemasukan/pengeluaran._";
+                } else {
+                    // Hanya mengambil 5 riwayat transaksi terakhir agar pesan tidak terlalu panjang
+                    const historiTerakhir = kasData[groupId].history.slice(-5);
+                    historiTerakhir.forEach(h => {
+                        info += `${h}\n`;
+                    });
+                }
+                msg.reply(info);
+            }
+        }
+
+        // ==========================================
+        // 📩 FITUR MENFESS (PESAN ANONIM)
+        // ==========================================
+        else if (command === '!menfess') {
+            // Pastikan ini lewat chat pribadi
+            if (chat.isGroup) {
+                return msg.reply('❌ Sssttt... Kirim perintah *!menfess* lewat chat pribadi (Japri) ke bot agar rahasia terjaga!');
+            }
+
+            const pesanMenfess = args.join(' ');
+            if (!pesanMenfess) return msg.reply('❌ Masukkan pesan yang ingin disampaikan!\nContoh: *!menfess Halo angkatan, jangan lupa kumpul besok ya!*');
+
+            try {
+                // Mengirim pesan ke Grup Angkatan
+                const grupAngkatan = await client.getChatById(ID_GRUP_ANGKATAN);
+                
+                await grupAngkatan.sendMessage(`📩 *PESAN ANONIM (MENFESS) MASUK* 📩\n\n_"${pesanMenfess}"_\n\n_Pesan ini dikirim secara rahasia melalui Bot._`);
+                msg.reply('✅ Pesan anonim kamu berhasil dikirim dan disebarkan ke grup angkatan!');
+            } catch (error) {
+                console.log("Error Menfess:", error);
+                msg.reply('❌ Gagal mengirim pesan. Pastikan bot sudah dimasukkan ke grup angkatan dan ID_GRUP_ANGKATAN sudah diisi dengan benar oleh Owner.');
+            }
+        }
+
+        // Alat bantu untuk Owner mengetahui ID Grup (Bisa dihapus nanti)
+        else if (command === '!cekidgrup' && isSudo) {
+            msg.reply(`ID Grup ini adalah:\n*${chat.id._serialized}*\n\n_Copy ID ini dan masukkan ke variabel ID_GRUP_ANGKATAN di dalam kode index.js_`);
         }
 
         else if (command === '!fitur') {
