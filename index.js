@@ -14,11 +14,14 @@ const os = require('os'); // Modul bawaan untuk info sistem
 const startTime = new Date(); // Mencatat waktu bot pertama kali dijalankan
 const { exec } = require('child_process');
 const fs = require('fs');
+const sudoUsers = [
+    '6285136468097@c.us'
+];
 
 let sesiAbsen = {};
-const daftarKataKasar = [
+let daftarKataKasar = [
     // --- ANJING & Variannya ---
-    'anjing', 'anj1ng', 'anj!ng', '4njing', '4nj1ng', '4nj!ng', 'anjg', 'njing', 'njeng', 'asu', '4su', 'asv', 'asyu',
+    'anjing', 'anj1ng', 'anj!ng', '4njing', '4nj1ng', '4nj!ng', 'anjg', 'njing', 'njeng', 'asu', '4su', 'asv', 'asyu', 'anj', 'anjj',
 
     // --- BABI & Variannya ---
     'babi', 'bab1', 'bab!', 'b4bi', 'b4b1', 'b4b!', 'bb',
@@ -39,8 +42,8 @@ const daftarKataKasar = [
 
     // --- KATA KOTOR / VULGAR ---
     'ngentot', 'ng3ntot', 'ngent0t', 'ng3nt0t', 'ngewe', 'ng3w3',
-    'kontol', 'k0ntol', 'kont0l', 'k0nt0l', 'kntl',
-    'memek', 'm3mek', 'mem3k', 'm3m3k', 'mmk',
+    'kontol', 'k0ntol', 'kont0l', 'k0nt0l', 'kntl', 'kanjut', 'knjt',
+    'memek', 'm3mek', 'mem3k', 'm3m3k', 'mmk', 'itil',
     'peler', 'pel3r', 'p3ler', 'p3l3r', 'plr',
     'jembut', 'j3mbut', 'jembvt', 'jmbt',
     'lonte', 'l0nte', 'lont3', 'l0nt3',
@@ -83,26 +86,29 @@ client.on('ready', () => {
 client.on('message', async (msg) => {
     const chat = await msg.getChat();
 
-    // PASTIKAN PESAN HANYA DIPROSES JIKA BERASAL DARI GRUP
-    if (chat.isGroup) {
-        const senderId = msg.author || msg.from;
-        const participants = chat.participants;
+    // 1. Definisikan ID pengirim dulu agar bisa dicek sudo/owner-nya
+    const senderContact = await msg.getContact();
+    const senderNumber = senderContact.number; 
+    const standardSenderId = `${senderNumber}@c.us`;
+
+    const isPrivateChat = !chat.isGroup;
+    const isSudo = sudoUsers.includes(standardSenderId);
+
+    // Bot merespons jika: di dalam grup ATAU (di chat pribadi DAN pengirimnya adalah Owner)
+    if (chat.isGroup || (isPrivateChat && isSudo)) {
+        const participants = chat.isGroup ? chat.participants : [];
         
-        // 1. Dapatkan data detail kontak si pengirim pesan
-        const senderContact = await msg.getContact();
-        const senderNumber = senderContact.number; 
-        const standardSenderId = `${senderNumber}@c.us`;
+        let isBotAdmin = false;
+        let isSenderAdmin = false;
 
-        // ==========================================
-        // 🚨 PERBAIKAN: PINDAHKAN CEK ADMIN KE SINI (PALING ATAS)
-        // ==========================================
-        const botId = `${client.info.wid.user}@c.us`; 
-        const bot = participants.find(p => p.id._serialized === botId);
-        const isBotAdmin = bot?.isAdmin || bot?.isSuperAdmin;
+        if (chat.isGroup) {
+            const botId = `${client.info.wid.user}@c.us`; 
+            const bot = participants.find(p => p.id._serialized === botId);
+            isBotAdmin = bot?.isAdmin || bot?.isSuperAdmin;
 
-        const sender = participants.find(p => p.id._serialized === standardSenderId);
-        const isSenderAdmin = sender?.isAdmin || sender?.isSuperAdmin;
-        // ==========================================
+            const sender = participants.find(p => p.id._serialized === standardSenderId);
+            isSenderAdmin = sender?.isAdmin || sender?.isSuperAdmin;
+        }
 
         // ==========================================
         // 🛡️ AUTO-MODERATOR (ANTI-LINK & FILTER KATA KASAR)
@@ -921,174 +927,159 @@ Teks yang harus diterjemahkan:
         }
 
         // ==========================================
-        // FITUR KHUSUS ADMIN (MODERATION)
-        // ==========================================
+// FITUR KHUSUS ADMIN & OWNER (MODERATION)
+// ==========================================
 
-        // Mengelompokkan perintah admin untuk dicek otoritasnya sekaligus
-        else if (['!tagall', '!kick', '!promote', '!demote', '!tutupgrup', '!bukagrup', '!blacklist', '!bukablacklist', '!on', '!off', '!zoom'].includes(command)) {
-            
-            // Jika yang mengirim BUKAN admin, tolak!
-            if (!isSenderAdmin) {
-                return msg.reply('❌ Maaf, perintah ini hanya bisa digunakan oleh Admin grup.');
-            }
+// Mengelompokkan perintah admin untuk dicek otoritasnya sekaligus
+// Mengelompokkan perintah admin untuk dicek otoritasnya sekaligus
+else if (['!tagall', '!kick', '!promote', '!demote', '!tutupgrup', '!bukagrup', '!blacklist', '!bukablacklist', '!on', '!off', '!zoom', '!meet', '!terlarang', '!listterlarang'].includes(command)) {
 
-            // --- Eksekusi Perintah Admin ---
+    // 1. Pastikan perintah ini HANYA di grup
+    if (!chat.isGroup) {
+        return msg.reply('❌ Perintah moderasi ini hanya bisa dijalankan di dalam grup.');
+    }
 
-            if (command === '!tagall') {
-                let text = "📢 *Pengumuman Admin* 📢\n\n";
-                let mentions = [];
-                for (let p of participants) {
-                    text += `@${p.id.user} `;
-                    mentions.push(p.id._serialized);
-                }
-                await chat.sendMessage(text, { mentions });
-            }
+    // 2. Cek otoritas: Admin Grup ATAU Sudo User (Owner)
+    if (!isSenderAdmin && !isSudo) { 
+        return msg.reply('❌ Maaf, perintah ini hanya bisa digunakan oleh Admin grup atau Owner.');
+    }
 
-            else if (command === '!kick') {
-                if (!isBotAdmin) return msg.reply('❌ Bot harus dijadikan Admin terlebih dahulu.');
-                if (msg.mentionedIds.length > 0) {
-                    
-                    let targetLolos = [];
-                    let targetHukum = [];
+    // --- EKSEKUSI PERINTAH ---
 
-                    // Mengecek satu per satu orang yang di-tag
-                    for (let id of msg.mentionedIds) {
-                        let targetPlayer = getPlayer(id);
-                        if (targetPlayer.kebalUntil > Date.now()) {
-                            targetLolos.push(id); // Masukkan ke daftar orang kebal
-                        } else {
-                            targetHukum.push(id); // Masukkan ke daftar orang biasa
-                        }
-                    }
-
-                    // Jika ada orang kebal yang mau di-kick, marahi adminnya
-                    if (targetLolos.length > 0) {
-                        msg.reply('⚠️ *TINDAKAN DITOLAK BOT!* ⚠️\nAdmin tidak bisa mengeluarkan anggota ini karena ia sedang menggunakan perlindungan *KEBAL VIP SULTAN!*');
-                    }
-
-                    // Eksekusi kick hanya untuk orang biasa
-                    if (targetHukum.length > 0) {
-                        await chat.removeParticipants(targetHukum);
-                        msg.reply('✅ Anggota biasa berhasil dikeluarkan dari grup.');
-                    }
-                } else {
-                    msg.reply('⚠️ Mohon tag orangnya. Contoh: *!kick @Budi*');
-                }
-            }
-
-            else if (command === '!promote') {
-                if (!isBotAdmin) return msg.reply('❌ Bot harus dijadikan Admin terlebih dahulu.');
-                if (msg.mentionedIds.length > 0) {
-                    await chat.promoteParticipants(msg.mentionedIds);
-                    msg.reply('✅ Anggota berhasil dinaikkan menjadi Admin.');
-                } else {
-                    msg.reply('⚠️ Mohon tag orangnya. Contoh: *!promote @Budi*');
-                }
-            }
-
-            else if (command === '!demote') {
-                if (!isBotAdmin) return msg.reply('❌ Bot harus dijadikan Admin terlebih dahulu.');
-                if (msg.mentionedIds.length > 0) {
-                    await chat.demoteParticipants(msg.mentionedIds);
-                    msg.reply('✅ Jabatan Admin berhasil dicabut dari anggota tersebut.');
-                } else {
-                    msg.reply('⚠️ Mohon tag orangnya. Contoh: *!demote @Budi*');
-                }
-            }
-
-            else if (command === '!tutupgrup') {
-                if (!isBotAdmin) return msg.reply('❌ Bot harus dijadikan Admin terlebih dahulu.');
-                await chat.setMessagesAdminsOnly(true);
-                msg.reply('🔒 *Grup ditutup.* Saat ini hanya Admin yang bisa mengirim pesan.');
-            }
-
-            else if (command === '!bukagrup') {
-                if (!isBotAdmin) return msg.reply('❌ Bot harus dijadikan Admin terlebih dahulu.');
-                await chat.setMessagesAdminsOnly(false);
-                msg.reply('🔓 *Grup dibuka.* Semua anggota kini bisa mengirim pesan kembali.');
-            }
-
-            // FITUR BLACKLIST
-            else if (command === '!blacklist') {
-                if (!isBotAdmin) return msg.reply('❌ Bot harus menjadi Admin untuk bisa menghapus pesan.');
-                if (msg.mentionedIds.length > 0) {
-                    
-                    // Mengecek apakah targetnya kebal
-                    let idTarget = msg.mentionedIds[0];
-                    let targetPlayer = getPlayer(idTarget);
-
-                    if (targetPlayer.kebalUntil > Date.now()) {
-                        return msg.reply('⚠️ *TINDAKAN DITOLAK BOT!* ⚠️\nKamu tidak bisa mem-blacklist anggota ini karena ia memiliki status *KEBAL VIP SULTAN!*');
-                    }
-
-                    // Jika tidak kebal, jalankan blacklist
-                    if (!blacklistedUsers.includes(idTarget)) {
-                        blacklistedUsers.push(idTarget);
-                    }
-                    msg.reply('🔇 Anggota berhasil diblacklist. Pesannya akan otomatis terhapus.');
-                } else {
-                    msg.reply('⚠️ Mohon tag orangnya. Contoh: *!blacklist @Budi*');
-                }
-            }
-
-            // FITUR BUKA BLACKLIST
-            else if (command === '!bukablacklist') {
-                if (msg.mentionedIds.length > 0) {
-                    // Menyaring/menghapus ID yang di-tag dari daftar blacklist
-                    blacklistedUsers = blacklistedUsers.filter(id => !msg.mentionedIds.includes(id));
-                    msg.reply('🔊 Blacklist dicabut.\nAnggota tersebut kini bisa mengirim pesan kembali dengan normal.');
-                } else {
-                    msg.reply('⚠️ Mohon tag orangnya. Contoh: *!bukablacklist @Budi*');
-                }
-            }
-
-            // ==========================================
-        // 🎥 FITUR BUAT RUANG RAPAT ONLINE (!zoom / !meet)
-        // ==========================================
-        else if (command === '!zoom' || command === '!meet') {
-            
-            // Opsional: Hapus 3 baris di bawah ini jika Anda ingin SEMUA ANGGOTA bisa memakai perintah ini
-            if (!isSenderAdmin) {
-                return msg.reply('❌ Maaf, hanya Admin yang bisa membuat ruang rapat.');
-            }
-
-            msg.reply('⏳ Sedang menyiapkan ruang rapat online...');
-
-            // Membuat kode acak (kombinasi angka dan huruf) agar ruang rapat tidak bentrok dengan orang lain
-            const randomCode = Math.random().toString(36).substring(2, 10);
-            
-            // Membentuk URL Jitsi Meet
-            // Anda bisa mengganti kata "RapatGrup" dengan nama pondok/grup Anda
-            const meetLink = `https://meet.jit.si/RapatGrup-${randomCode}`;
-
-            const pesanRapat = `🎥 *UNDANGAN RAPAT ONLINE* 🎥\n\nRuang rapat telah berhasil dibuat! \nSilakan klik tautan di bawah ini untuk langsung bergabung (Tidak perlu login/daftar):\n\n🔗 ${meetLink}\n\n_Catatan: Jika ditanya, izinkan akses mikrofon dan kamera Anda._`;
-
-            // Mengirimkan link ke grup
-            msg.reply(pesanRapat);
+    if (command === '!tagall') {
+        let text = "📢 *Pengumuman Admin* 📢\n\n";
+        let mentions = [];
+        for (let p of participants) {
+            text += `@${p.id.user} `;
+            mentions.push(p.id._serialized);
         }
+        await chat.sendMessage(text, { mentions });
+    } 
+    
+    else if (command === '!terlarang') {
+        const kataBaru = args[0]?.toLowerCase();
+        if (!kataBaru) return msg.reply('⚠️ Masukkan kata yang ingin dilarang.');
+        if (daftarKataKasar.includes(kataBaru)) return msg.reply(`⚠️ Kata *${kataBaru}* sudah ada.`);
+        daftarKataKasar.push(kataBaru);
+        msg.reply(`✅ Berhasil! Kata *${kataBaru}* ditambahkan ke filter RAM.`);
+    } 
+    
+    else if (command === '!listterlarang') {
+        let list = "*🚫 DAFTAR KATA TERLARANG SAAT INI:*\n\n";
+        daftarKataKasar.forEach((kata, i) => { list += `${i + 1}. ${kata}\n`; });
+        msg.reply(list);
+    }
 
-            // FITUR MATIKAN BOT
-            else if (command === '!off') {
-                // Jika grup ini belum ada di daftar inactive, maka masukkan
-                if (!inactiveGroups.includes(chat.id._serialized)) {
-                    inactiveGroups.push(chat.id._serialized);
-                    msg.reply('💤 Bot berhasil dimatikan di grup ini.\nSemua perintah akan diabaikan sampai Admin mengetik *!on*.');
+    else if (command === '!kick') {
+        if (!isBotAdmin) return msg.reply('❌ Bot harus dijadikan Admin terlebih dahulu.');
+        if (msg.mentionedIds.length > 0) {
+            let targetLolos = [];
+            let targetHukum = [];
+
+            for (let id of msg.mentionedIds) {
+                let targetPlayer = getPlayer(id);
+                if (targetPlayer.kebalUntil > Date.now() || sudoUsers.includes(id)) {
+                    targetLolos.push(id);
                 } else {
-                    msg.reply('⚠️ Bot memang sudah dalam keadaan mati.');
+                    targetHukum.push(id);
                 }
             }
 
-            // FITUR NYALAKAN BOT
-            else if (command === '!on') {
-                // Jika grup ini ada di daftar inactive, maka hapus dari daftar
-                if (inactiveGroups.includes(chat.id._serialized)) {
-                    inactiveGroups = inactiveGroups.filter(id => id !== chat.id._serialized);
-                    msg.reply('🟢 Bot kembali aktif! Semua fitur dapat digunakan lagi.');
-                } else {
-                    msg.reply('⚠️ Bot sudah dalam keadaan aktif.');
-                }
+            if (targetLolos.length > 0) {
+                msg.reply('⚠️ *TINDAKAN DITOLAK!* ⚠️\nAnggota tersebut memiliki perlindungan (Kebal VIP atau Owner).');
             }
+
+            if (targetHukum.length > 0) {
+                await chat.removeParticipants(targetHukum);
+                msg.reply('✅ Anggota berhasil dikeluarkan.');
+            }
+        } else {
+            msg.reply('⚠️ Mohon tag orangnya. Contoh: *!kick @Budi*');
         }
+    }
+
+    else if (command === '!promote') {
+        if (!isBotAdmin) return msg.reply('❌ Bot harus dijadikan Admin terlebih dahulu.');
+        if (msg.mentionedIds.length > 0) {
+            await chat.promoteParticipants(msg.mentionedIds);
+            msg.reply('✅ Anggota berhasil dinaikkan menjadi Admin.');
+        } else {
+            msg.reply('⚠️ Mohon tag orangnya.');
+        }
+    }
+
+    else if (command === '!demote') {
+        if (!isBotAdmin) return msg.reply('❌ Bot harus dijadikan Admin terlebih dahulu.');
+        if (msg.mentionedIds.length > 0) {
+            await chat.demoteParticipants(msg.mentionedIds);
+            msg.reply('✅ Jabatan Admin dicabut.');
+        } else {
+            msg.reply('⚠️ Mohon tag orangnya.');
+        }
+    }
+
+    else if (command === '!tutupgrup') {
+        if (!isBotAdmin) return msg.reply('❌ Bot harus dijadikan Admin terlebih dahulu.');
+        await chat.setMessagesAdminsOnly(true);
+        msg.reply('🔒 *Grup ditutup.* Hanya Admin yang bisa chat.');
+    }
+
+    else if (command === '!bukagrup') {
+        if (!isBotAdmin) return msg.reply('❌ Bot harus dijadikan Admin terlebih dahulu.');
+        await chat.setMessagesAdminsOnly(false);
+        msg.reply('🔓 *Grup dibuka.* Semua anggota bisa chat kembali.');
+    }
+
+    else if (command === '!blacklist') {
+        if (!isBotAdmin) return msg.reply('❌ Bot harus Admin untuk menghapus pesan.');
+        if (msg.mentionedIds.length > 0) {
+            let idTarget = msg.mentionedIds[0];
+            let targetPlayer = getPlayer(idTarget);
+            if (targetPlayer.kebalUntil > Date.now() || sudoUsers.includes(idTarget)) {
+                return msg.reply('⚠️ Anggota ini kebal/Owner!');
+            }
+            if (!blacklistedUsers.includes(idTarget)) {
+                blacklistedUsers.push(idTarget);
+            }
+            msg.reply('🔇 Berhasil diblacklist.');
+        } else {
+            msg.reply('⚠️ Tag orangnya!');
+        }
+    }
+
+    else if (command === '!bukablacklist') {
+        if (msg.mentionedIds.length > 0) {
+            blacklistedUsers = blacklistedUsers.filter(id => !msg.mentionedIds.includes(id));
+            msg.reply('🔊 Blacklist dicabut.');
+        } else {
+            msg.reply('⚠️ Tag orangnya!');
+        }
+    }
+
+    else if (command === '!zoom' || command === '!meet') {
+        const randomCode = Math.random().toString(36).substring(2, 10);
+        const meetLink = `https://meet.jit.si/RapatGrup-${randomCode}`;
+        msg.reply(`🎥 *UNDANGAN RAPAT ONLINE*\n\n🔗 ${meetLink}`);
+    }
+
+    else if (command === '!off') {
+        if (!inactiveGroups.includes(chat.id._serialized)) {
+            inactiveGroups.push(chat.id._serialized);
+            msg.reply('💤 Bot dimatikan di grup ini.');
+        } else {
+            msg.reply('⚠️ Bot sudah mati.');
+        }
+    }
+
+    else if (command === '!on') {
+        if (inactiveGroups.includes(chat.id._serialized)) {
+            inactiveGroups = inactiveGroups.filter(id => id !== chat.id._serialized);
+            msg.reply('🟢 Bot kembali aktif!');
+        } else {
+            msg.reply('⚠️ Bot sudah aktif.');
+        }
+    }
+} // <--- Penutup blok utama perintah admin
     }
 });
 
