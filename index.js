@@ -472,11 +472,11 @@ _Bot siap melayani grup ini!_`);
             if (!chat.isGroup) return msg.reply('❌ Fitur ini hanya untuk di grup!');
             if (!isSenderAdmin && !isSudo) return msg.reply('❌ Hanya Admin Grup yang bisa memberikan gelar ke anggota!');
             
-            const mentioned = await msg.getMentions();
-            if (mentioned.length === 0) return msg.reply('❌ Tag orang yang mau dikasih gelar!\nContoh: *!setgelar @Budi Duta Wacana*');
+            // Perbaikan: Menggunakan mentionedIds yang lebih cepat dan anti-error
+            if (msg.mentionedIds.length === 0) return msg.reply('❌ Tag orang yang mau dikasih gelar!\nContoh: *!setgelar @Budi Duta Wacana*');
             
-            const target = mentioned[0];
-            const targetUser = target.id.user;
+            const targetId = msg.mentionedIds[0];
+            const targetUser = targetId.split('@')[0];
             
             // Memisahkan nama gelar dari teks (mengabaikan tag @orang)
             const titleArgs = args.filter(a => !a.includes(targetUser));
@@ -484,30 +484,27 @@ _Bot siap melayani grup ini!_`);
 
             if (!gelar) return msg.reply('❌ Masukkan nama gelarnya!\nContoh: *!setgelar @Budi Duta Wacana*');
 
-            gelarAngkatan[target.id._serialized] = gelar;
-            msg.reply(`🏆 Sah! *@${targetUser}* sekarang resmi dinobatkan sebagai:\n*${gelar}*`, { mentions: [target] });
+            gelarAngkatan[targetId] = gelar;
+            msg.reply(`🏆 Sah! *@${targetUser}* sekarang resmi dinobatkan sebagai:\n*${gelar}*`, { mentions: [targetId] });
         }
         else if (command === '!gelar') {
             if (!chat.isGroup) return msg.reply('❌ Fitur ini hanya untuk di grup!');
             
             let targetId = standardSenderId;
-            let targetObj = senderContact;
             
             // Cek apakah dia mau lihat gelarnya sendiri atau gelar orang lain
-            const mentioned = await msg.getMentions();
-            if (mentioned.length > 0) {
-                targetObj = mentioned[0];
-                targetId = targetObj.id._serialized;
+            if (msg.mentionedIds.length > 0) {
+                targetId = msg.mentionedIds[0];
             }
 
-            const targetUser = targetObj.id.user;
+            const targetUser = targetId.split('@')[0];
             const gelar = gelarAngkatan[targetId];
 
             if (!gelar) {
-                return msg.reply(`Belum ada gelar untuk *@${targetUser}*. Kasihan banget cuma jadi NPC di grup ini.`, { mentions: [targetObj] });
+                return msg.reply(`Belum ada gelar untuk *@${targetUser}*. Kasihan banget cuma jadi NPC di grup ini.`, { mentions: [targetId] });
             }
 
-            msg.reply(`🏆 *AWARDS ANGKATAN* 🏆\n\nNama: *@${targetUser}*\nGelar Kehormatan: *${gelar}*`, { mentions: [targetObj] });
+            msg.reply(`🏆 *AWARDS ANGKATAN* 🏆\n\nNama: *@${targetUser}*\nGelar Kehormatan: *${gelar}*`, { mentions: [targetId] });
         }
 
         // ==========================================
@@ -516,16 +513,15 @@ _Bot siap melayani grup ini!_`);
         else if (command === '!seberapa') {
             if (args.length < 1) return msg.reply('❌ Format salah!\nContoh: *!seberapa wacana @Doni*');
             
-            const mentioned = await msg.getMentions();
-            let targetObj = senderContact;
+            let targetId = standardSenderId;
             
-            if (mentioned.length > 0) {
-                targetObj = mentioned[0];
+            if (msg.mentionedIds.length > 0) {
+                targetId = msg.mentionedIds[0];
             }
 
-            const targetUser = targetObj.id.user;
+            const targetUser = targetId.split('@')[0];
 
-            // Ambil kata sifat dengan menghapus mention dari argumen
+            // Ambil kata sifat dengan menghapus angka nomor WA dari argumen
             const sifatArgs = args.filter(a => !a.includes(targetUser));
             const sifat = sifatArgs.join(' ') || "Misterius";
 
@@ -539,7 +535,7 @@ _Bot siap melayani grup ini!_`);
             else if (persentase < 80) komentar = "_Agak meresahkan ya, tolong dikondisikan!_";
             else komentar = "_Parah banget! Ini sih udah mendarah daging!_";
 
-            msg.reply(`📊 *CEK SEBERAPA ${sifat.toUpperCase()}* 📊\n\nTingkat *${sifat}* dari *@${targetUser}* adalah: *${persentase}%*!\n\n${komentar}`, { mentions: [targetObj] });
+            msg.reply(`📊 *CEK SEBERAPA ${sifat.toUpperCase()}* 📊\n\nTingkat *${sifat}* dari *@${targetUser}* adalah: *${persentase}%*!\n\n${komentar}`, { mentions: [targetId] });
         }
 
         // ==========================================
