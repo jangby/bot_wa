@@ -18,6 +18,7 @@ const sudoUsers = [
     '6285136468097@c.us'
 ];
 let disabledFeatures = [];
+let ttsCooldowns = {};
 
 let sesiAbsen = {};
 let daftarKataKasar = [
@@ -517,6 +518,22 @@ _Bot siap melayani grup ini!_`);
         else if (command === '!tts') {
             const teksTts = args.join(' ');
             if (!teksTts) return msg.reply('❌ Masukkan teksnya!\nContoh: *!tts Pengumuman untuk semua santri di asrama*');
+
+            // --- SISTEM ANTI SPAM (COOLDOWN 2 MENIT) ---
+            if (!isSudo) { // Jika bukan Owner, maka kena limit
+                const waktuSekarang = Date.now();
+                const waktuCooldown = 2 * 60 * 1000; // 2 menit = 120.000 milidetik
+
+                // Cek apakah user sudah pernah pakai dan waktunya belum lewat 2 menit
+                if (ttsCooldowns[standardSenderId] && (waktuSekarang - ttsCooldowns[standardSenderId]) < waktuCooldown) {
+                    const sisaDetik = Math.ceil((waktuCooldown - (waktuSekarang - ttsCooldowns[standardSenderId])) / 1000);
+                    return msg.reply(`⏳ *Anti-Spam Aktif:* Kamu baru bisa menggunakan perintah *!tts* lagi dalam ${sisaDetik} detik.`);
+                }
+
+                // Catat waktu penggunaan !tts terakhir untuk user ini
+                ttsCooldowns[standardSenderId] = waktuSekarang;
+            }
+            // ------------------------------------------
 
             try {
                 msg.reply('⏳ Sedang memproses suara...');
