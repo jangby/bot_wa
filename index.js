@@ -16,7 +16,8 @@ const { exec } = require('child_process');
 const fs = require('fs');
 const sudoUsers = [
     '6285136468097@c.us',
-    '6285182484981@c.us'
+    '6285182484981@c.us',
+    '628@c.us'
 ];
 let disabledFeatures = [];
 let ttsCooldowns = {};
@@ -24,6 +25,8 @@ let ultahData = {};
 let kasData = {};
 let lokerAngkatan = [];
 let jombloAngkatan = {};
+let gelarAngkatan = {};
+let kapsulWaktu = [];
 const daftarKhodam = [
     // --- HEWAN & MAKHLUK AJAIB ---
     "Macan Cisewu (Keliatannya garang tapi aslinya gemesin)",
@@ -374,6 +377,172 @@ _Bot siap melayani grup ini!_`);
         }
 
         // ==========================================
+        // 💸 FITUR KALKULATOR PATUNGAN
+        // ==========================================
+        else if (command === '!patungan') {
+            if (args.length < 2) return msg.reply('❌ Format salah!\nContoh: *!patungan 150000 5* (Artinya: 150 ribu dibagi 5 orang)');
+            
+            const total = parseInt(args[0]);
+            const orang = parseInt(args[1]);
+
+            if (isNaN(total) || isNaN(orang) || orang <= 0) {
+                return msg.reply('❌ Nominal tagihan dan jumlah orang harus berupa angka!');
+            }
+
+            const perOrang = Math.ceil(total / orang);
+            
+            // Fungsi untuk membuat format Rupiah (Rp)
+            const formatRupiah = (angka) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR' }).format(angka);
+
+            msg.reply(`💸 *KALKULATOR NONGKRONG* 💸\n\nTotal tagihan: *${formatRupiah(total)}*\nDibagi: *${orang} orang*\n\n👉 *Masing-masing wajib bayar: ${formatRupiah(perOrang)}*\n\n_Ayo buruan ditransfer ke yang nalangin, jangan pura-pura ke toilet pas tagihan dateng!_`);
+        }
+
+        // ==========================================
+        // ⏳ FITUR KAPSUL WAKTU
+        // ==========================================
+        else if (command === '!kapsulwaktu') {
+            if (args.length < 2) return msg.reply('❌ Format salah!\nContoh: *!kapsulwaktu 31-12-2024 Semoga tahun depan gue udah nikah!*');
+            
+            const tanggalBuka = args[0];
+            const regexTgl = /^\d{2}-\d{2}-\d{4}$/; // Mengecek format DD-MM-YYYY
+            if (!regexTgl.test(tanggalBuka)) return msg.reply('❌ Format tanggal harus DD-MM-YYYY\nContoh: *31-12-2024*');
+
+            const pesanKapsul = args.slice(1).join(' ');
+            if (!pesanKapsul) return msg.reply('❌ Masukkan pesan untuk kapsul waktunya!');
+
+            const pengirim = senderContact.pushname || senderNumber;
+            const tglBuat = new Date().toLocaleDateString('id-ID');
+
+            kapsulWaktu.push({
+                tanggalBuka: tanggalBuka,
+                pesan: pesanKapsul,
+                pengirim: pengirim,
+                tglBuat: tglBuat
+            });
+
+            msg.reply(`⏳ *KAPSUL WAKTU BERHASIL DITANAM!*\n\nPesan dari *${pengirim}* telah disimpan dan dikunci oleh sistem bot.\nPesan ini baru bisa dibaca pada tanggal *${tanggalBuka}*.\n\n_Ssttt... Untuk mengecek atau membuka kapsul waktu, ketik *!bukakapsul* pada tanggal yang ditentukan!_`);
+        }
+        else if (command === '!bukakapsul') {
+            if (kapsulWaktu.length === 0) return msg.reply('📭 Belum ada kapsul waktu yang ditanam di grup ini.');
+
+            const tglSekarang = new Date();
+            // Membuat format string tanggal hari ini (DD-MM-YYYY)
+            const tglStr = ("0" + tglSekarang.getDate()).slice(-2) + "-" + ("0" + (tglSekarang.getMonth() + 1)).slice(-2) + "-" + tglSekarang.getFullYear();
+
+            let kapsulTerbuka = [];
+            let kapsulSisa = [];
+
+            // Memisahkan kapsul yang sudah boleh dibuka dan yang belum
+            kapsulWaktu.forEach(k => {
+                const [d1, m1, y1] = k.tanggalBuka.split('-');
+                const [d2, m2, y2] = tglStr.split('-');
+                
+                const dateKapsul = new Date(y1, m1 - 1, d1);
+                const dateSkrg = new Date(y2, m2 - 1, d2);
+
+                if (dateSkrg >= dateKapsul) {
+                    kapsulTerbuka.push(k); // Boleh dibuka
+                } else {
+                    kapsulSisa.push(k); // Belum waktunya
+                }
+            });
+
+            if (kapsulTerbuka.length === 0) {
+                return msg.reply(`⏳ Belum ada kapsul waktu yang siap dibuka untuk hari ini (*${tglStr}*).\nSabar ya, tunggu tanggal mainnya!`);
+            }
+
+            let balasan = `✨ *KAPSUL WAKTU TERBUKA!* ✨\n\nHari ini (*${tglStr}*), mari kita baca pesan-pesan dari masa lalu:\n\n`;
+
+            kapsulTerbuka.forEach((k, idx) => {
+                balasan += `*${idx + 1}. Dari: ${k.pengirim}* (Ditulis: ${k.tglBuat})\n📝 _"${k.pesan}"_\n\n`;
+            });
+
+            balasan += `_Masa lalu adalah kenangan, masa depan adalah misteri. Selamat bernostalgia!_`;
+
+            // Hapus kapsul yang sudah dibuka dari memori
+            kapsulWaktu = kapsulSisa;
+
+            msg.reply(balasan);
+        }
+
+        // ==========================================
+        // 🏆 FITUR PAPAN GELAR / AWARDS
+        // ==========================================
+        else if (command === '!setgelar') {
+            if (!chat.isGroup) return msg.reply('❌ Fitur ini hanya untuk di grup!');
+            if (!isSenderAdmin && !isSudo) return msg.reply('❌ Hanya Admin Grup yang bisa memberikan gelar ke anggota!');
+            
+            const mentioned = await msg.getMentions();
+            if (mentioned.length === 0) return msg.reply('❌ Tag orang yang mau dikasih gelar!\nContoh: *!setgelar @Budi Duta Wacana*');
+            
+            const target = mentioned[0];
+            const targetUser = target.id.user;
+            
+            // Memisahkan nama gelar dari teks (mengabaikan tag @orang)
+            const titleArgs = args.filter(a => !a.includes(targetUser));
+            const gelar = titleArgs.join(' ');
+
+            if (!gelar) return msg.reply('❌ Masukkan nama gelarnya!\nContoh: *!setgelar @Budi Duta Wacana*');
+
+            gelarAngkatan[target.id._serialized] = gelar;
+            msg.reply(`🏆 Sah! *@${targetUser}* sekarang resmi dinobatkan sebagai:\n*${gelar}*`, { mentions: [target] });
+        }
+        else if (command === '!gelar') {
+            if (!chat.isGroup) return msg.reply('❌ Fitur ini hanya untuk di grup!');
+            
+            let targetId = standardSenderId;
+            let targetObj = senderContact;
+            
+            // Cek apakah dia mau lihat gelarnya sendiri atau gelar orang lain
+            const mentioned = await msg.getMentions();
+            if (mentioned.length > 0) {
+                targetObj = mentioned[0];
+                targetId = targetObj.id._serialized;
+            }
+
+            const targetUser = targetObj.id.user;
+            const gelar = gelarAngkatan[targetId];
+
+            if (!gelar) {
+                return msg.reply(`Belum ada gelar untuk *@${targetUser}*. Kasihan banget cuma jadi NPC di grup ini.`, { mentions: [targetObj] });
+            }
+
+            msg.reply(`🏆 *AWARDS ANGKATAN* 🏆\n\nNama: *@${targetUser}*\nGelar Kehormatan: *${gelar}*`, { mentions: [targetObj] });
+        }
+
+        // ==========================================
+        // 🌡️ FITUR CEK SEBERAPA (RNG LUCU)
+        // ==========================================
+        else if (command === '!seberapa') {
+            if (args.length < 1) return msg.reply('❌ Format salah!\nContoh: *!seberapa wacana @Doni*');
+            
+            const mentioned = await msg.getMentions();
+            let targetObj = senderContact;
+            
+            if (mentioned.length > 0) {
+                targetObj = mentioned[0];
+            }
+
+            const targetUser = targetObj.id.user;
+
+            // Ambil kata sifat dengan menghapus mention dari argumen
+            const sifatArgs = args.filter(a => !a.includes(targetUser));
+            const sifat = sifatArgs.join(' ') || "Misterius";
+
+            // Membuat angka acak dari 0 sampai 100
+            const persentase = Math.floor(Math.random() * 101); 
+            
+            // Menyesuaikan komentar AI dengan hasil persentase
+            let komentar = "";
+            if (persentase < 20) komentar = "_Aman bos, masih dalam batas wajar._";
+            else if (persentase < 50) komentar = "_Lumayan lah, butuh sedikit introspeksi diri._";
+            else if (persentase < 80) komentar = "_Agak meresahkan ya, tolong dikondisikan!_";
+            else komentar = "_Parah banget! Ini sih udah mendarah daging!_";
+
+            msg.reply(`📊 *CEK SEBERAPA ${sifat.toUpperCase()}* 📊\n\nTingkat *${sifat}* dari *@${targetUser}* adalah: *${persentase}%*!\n\n${komentar}`, { mentions: [targetObj] });
+        }
+
+        // ==========================================
         // 📊 FITUR POLLING / WACANA
         // ==========================================
         else if (command === '!voting' || command === '!wacana') {
@@ -654,6 +823,24 @@ _Bot siap melayani grup ini!_`);
 • *!admin* : Panggil semua admin grup
 • *!cuaca [kota]* : Info cuaca hari ini
 • *!quotes* : Kata-kata mutiara acak
+• *!menfess [pesan]* : Kirim pesan rahasia ke grup (Kirim lewat Japri ke Bot)
+
+*🎓 FITUR ANGKATAN & TONGKRONGAN*
+• *!cekkhodam [nama]* : Cek khodam pendampingmu
+• *!siapa [tanya]* : Bot akan memilih acak tumbal/target di grup
+• *!seberapa [sifat] @user* : Cek persentase tingkat sifat temanmu
+• *!setultah [DD-MM]* : Daftarkan tanggal ulang tahunmu
+• *!ultah* : Cek daftar teman yang ultah bulan ini
+• *!jomblo* / *!setjomblo* : Radar pencari jodoh & status jomblo
+• *!gelar [@user]* : Cek gelar kehormatan temanmu
+• *!kapsulwaktu [Tgl-Bln-Thn] [pesan]* : Tanam pesan untuk masa depan
+• *!bukakapsul* : Buka kapsul waktu yang sudah jatuh tempo
+
+*💼 KEUANGAN & PEKERJAAN*
+• *!patungan [total] [orang]* : Kalkulator instan split bill/patungan
+• *!kas* : Cek buku kas grup (*!kas tambah/kurang* khusus Admin)
+• *!loker* : Lihat portal lowongan kerja internal angkatan
+• *!addloker* / *!delloker* : Tambah atau hapus info loker
 
 *🕌 FITUR ISLAMI*
 • *!sholat [kota]* : Jadwal sholat 5 waktu
@@ -664,17 +851,15 @@ _Bot siap melayani grup ini!_`);
 • *!sticker* : Buat stiker (Kirim/Reply foto dgn !sticker)
 • *!steks [teks]* : Buat stiker teks tebal
 • *!vn* : Ubah file MP3 jadi Voice Note
-• *!tts [teks]* : Ubah teks jadi suara (Text-to-Speech)
+• *!tts [teks]* : Ubah teks jadi suara (Limit 2 menit/user agar tidak spam)
 • *!translate [bahasa] [teks]* : Terjemahan AI (id/en/ar/su)
 • *!zoom* / *!meet* : Buat link ruang rapat online (Admin)
 
 *📋 PRODUKTIVITAS GRUP*
-• *!reminder [waktu] [pesan]* : Pasang pengingat (Contoh: 10m Rapat pengurus)
-• *!simpan [judul] [isi]* : Simpan informasi penting
-• *!catatan* : Lihat daftar catatan grup yang tersimpan
-• *!bukaabsen [nama acara]* : Buka sesi daftar hadir (Admin)
-• *!hadir* : Mengisi daftar hadir
-• *!tutupabsen* : Tutup absen & lihat rekapitulasi (Admin)
+• *!voting [Tanya] | [Opsi1] | [Opsi2]* : Bikin polling (Anti-wacana)
+• *!reminder [waktu] [pesan]* : Pasang pengingat (Contoh: 10m Rapat)
+• *!simpan* / *!catatan* : Simpan info penting grup
+• *!bukaabsen* / *!hadir* / *!tutupabsen* : Sistem absensi acara
 
 *🎮 MINI GAME & EKONOMI*
 • *!kuis* : Kuis tebak-tebakan bersama AI Gemini
@@ -682,18 +867,18 @@ _Bot siap melayani grup ini!_`);
 • *!tebak [1-10] [taruhan]* : Main tebak angka 
 • *!belikebal* : Beli perlindungan dari Kick (1000 Poin)
 
-*👑 MODERASI (Khusus Admin)*
+*👑 MODERASI (Khusus Admin / Owner)*
 • *!tagall* : Mention semua anggota grup
-• *!kick @user* : Keluarkan anggota (Kecuali VIP)
-• *!promote* / *!demote @user* : Atur jabatan admin
+• *!setgelar @user [gelar]* : Beri julukan/title ke member
+• *!kick* / *!promote* / *!demote* : Manajemen member
 • *!tutupgrup* / *!bukagrup* : Kunci/buka akses chat grup
-• *!blacklist @user* : Hapus pesan orang ini secara otomatis
-• *!bukablacklist @user* : Cabut hukuman blacklist
+• *!blacklist* / *!bukablacklist* : Hukuman auto-hapus pesan
 • *!off* / *!on* : Matikan/nyalakan bot di grup ini
+• *!fitur [nama_fitur] [on/off]* : Matikan fitur/perintah tertentu (Khusus Owner)
 
 *🛡️ SISTEM OTOMATIS BOT (Selalu Aktif)*
 • *Anti-Link*: Menghapus link grup luar yang dikirim anggota biasa.
-• *Filter Kata Kasar*: Menjaga adab percakapan dengan menghapus pesan tidak pantas.`;
+• *Filter Kata Kasar*: Menjaga adab percakapan dengan menghapus kata tidak pantas.`;
 
             msg.reply(menu);
         }
@@ -892,7 +1077,7 @@ _Bot siap melayani grup ini!_`);
                 // Cek apakah user sudah pernah pakai dan waktunya belum lewat 2 menit
                 if (ttsCooldowns[standardSenderId] && (waktuSekarang - ttsCooldowns[standardSenderId]) < waktuCooldown) {
                     const sisaDetik = Math.ceil((waktuCooldown - (waktuSekarang - ttsCooldowns[standardSenderId])) / 1000);
-                    return msg.reply(`⏳ *Anti-Spam Aktif:* Kamu baru bisa menggunakan perintah *!tts* lagi dalam ${sisaDetik} detik.`);
+                    return msg.reply(`⏳ *Limit Habis:* Kamu baru bisa menggunakan perintah *!tts* lagi dalam ${sisaDetik} detik.`);
                 }
 
                 // Catat waktu penggunaan !tts terakhir untuk user ini
