@@ -22,6 +22,8 @@ let disabledFeatures = [];
 let ttsCooldowns = {};
 let ultahData = {};
 let kasData = {};
+let lokerAngkatan = [];
+let jombloAngkatan = {};
 const daftarKhodam = [
     // --- HEWAN & MAKHLUK AJAIB ---
     "Macan Cisewu (Keliatannya garang tapi aslinya gemesin)",
@@ -369,6 +371,111 @@ client.on('message', async (msg) => {
 • *Aktif Sejak:* ${sejakKapan} WIB
 
 _Bot siap melayani grup ini!_`);
+        }
+
+        // ==========================================
+        // 📊 FITUR POLLING / WACANA
+        // ==========================================
+        else if (command === '!voting' || command === '!wacana') {
+            if (!chat.isGroup) return msg.reply('❌ Fitur ini hanya untuk di grup!');
+            
+            // Menggabungkan pesan setelah perintah !voting
+            const teksVoting = args.join(' ');
+            
+            // Mengecek apakah formatnya menggunakan garis lurus "|"
+            if (!teksVoting.includes('|')) {
+                return msg.reply('❌ Format salah!\nCara pakai: *!voting [Pertanyaan] | [Opsi1] | [Opsi2]*\n\nContoh: *!voting Besok nongkrong dimana? | Warkop | Cafe | Angkringan*');
+            }
+
+            // Memecah teks berdasarkan karakter "|"
+            const pisah = teksVoting.split('|').map(item => item.trim());
+            const pertanyaan = pisah[0];
+            const opsi = pisah.slice(1);
+
+            if (opsi.length < 2) return msg.reply('❌ Minimal harus ada 2 pilihan (opsi)!');
+            if (opsi.length > 12) return msg.reply('❌ WhatsApp hanya mengizinkan maksimal 12 pilihan (opsi)!');
+
+            try {
+                // Mengambil fitur Polling bawaan dari whatsapp-web.js
+                const { Poll } = require('whatsapp-web.js');
+                
+                // Mengirimkan Polling (Voting) asli ke grup
+                await chat.sendMessage(new Poll(pertanyaan, opsi));
+            } catch (error) {
+                console.log("Error Polling:", error);
+                msg.reply('❌ Gagal membuat voting. Pastikan versi library bot kamu sudah mendukung fitur Polling WhatsApp.');
+            }
+        }
+
+        // ==========================================
+        // 💼 FITUR PORTAL LOKER INTERNAL
+        // ==========================================
+        else if (command === '!addloker') {
+            const infoLoker = args.join(' ');
+            if (!infoLoker) return msg.reply('❌ Masukkan detail info lokernya!\nContoh: *!addloker Admin Sosmed - PT Maju - Hubungi Dika*');
+            
+            const pengirim = senderContact.pushname || senderNumber;
+            // Menyimpan loker beserta tanggal saat ini
+            const tanggal = new Date().toLocaleDateString('id-ID');
+            
+            lokerAngkatan.push({ info: infoLoker, dari: pengirim, tgl: tanggal });
+            
+            msg.reply('✅ Info lowongan kerja berhasil ditambahkan ke portal!\nKetik *!loker* untuk melihat seluruh daftar loker angkatan.');
+        }
+        else if (command === '!loker') {
+            if (lokerAngkatan.length === 0) return msg.reply('📭 Belum ada info lowongan kerja saat ini.\nKetik *!addloker [Info]* untuk membagikan info loker ke teman-teman.');
+            
+            let pesan = '💼 *PORTAL LOKER ANGKATAN* 💼\n\n';
+            lokerAngkatan.forEach((loker, index) => {
+                pesan += `*${index + 1}.* ${loker.info}\n_(Dari: ${loker.dari} | ${loker.tgl})_\n\n`;
+            });
+            pesan += 'Semoga cepat dapet kerja/naik gaji ya! Semangat! 🚀\n_(Ketik *!delloker [nomor]* untuk menghapus loker yang sudah kedaluwarsa)_';
+            
+            msg.reply(pesan);
+        }
+        else if (command === '!delloker') {
+            // Fitur hapus loker agar list tidak kepanjangan
+            const index = parseInt(args[0]) - 1;
+            if (isNaN(index) || index < 0 || index >= lokerAngkatan.length) {
+                return msg.reply('❌ Masukkan nomor loker yang valid untuk dihapus.\nContoh: *!delloker 1*');
+            }
+            
+            lokerAngkatan.splice(index, 1);
+            msg.reply('✅ Info loker tersebut berhasil dihapus dari portal.');
+        }
+
+        // ==========================================
+        // 💔 FITUR RADAR JOMBLO / BIRO JODOH
+        // ==========================================
+        else if (command === '!setjomblo') {
+            const nama = senderContact.pushname || senderNumber;
+            
+            if (jombloAngkatan[standardSenderId]) {
+                // Kalau datanya sudah ada, berarti dia mau hapus status (udah laku/punya pacar)
+                delete jombloAngkatan[standardSenderId];
+                return msg.reply('🎉 Cieee! Status jomblo kamu udah dicabut. Langgeng terus ya sama pasangannya!');
+            } else {
+                // Kalau belum ada, tambahkan ke daftar jomblo
+                jombloAngkatan[standardSenderId] = nama;
+                return msg.reply('💔 Status jomblo berhasil didaftarkan!\nSemoga cepat nemu jodoh ya. Ketik *!listjomblo* buat ngecek sainganmu.');
+            }
+        }
+        else if (command === '!listjomblo' || command === '!jomblo') {
+            const daftarJomblo = Object.keys(jombloAngkatan);
+            
+            if (daftarJomblo.length === 0) return msg.reply('✨ Wah hebat, sepertinya di grup ini udah pada punya pasangan semua (atau pada gengsi ngaku jomblo).');
+            
+            let pesan = '💔 *RADAR JOMBLO ANGKATAN* 💔\n\nMendeteksi ada jiwa-jiwa kesepian di grup ini. Silakan japri nama-nama di bawah ini jika berminat:\n\n';
+            
+            // Loop untuk menyebutkan dan mention satu per satu
+            daftarJomblo.forEach((id, index) => {
+                pesan += `${index + 1}. @${id.split('@')[0]}\n`;
+            });
+            
+            pesan += '\n_Ketik *!setjomblo* untuk mendaftar atau mencabut status jomblo kamu._';
+            
+            // Mengirim pesan dengan mention otomatis ke anak-anak jomblo
+            await chat.sendMessage(pesan, { mentions: daftarJomblo });
         }
 
         // ==========================================
