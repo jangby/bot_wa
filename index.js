@@ -12,6 +12,8 @@ const kumpulanQuotes = require('./quotes.js');
 const bankSoal = require('./bankSoal.js'); // Memanggil bank soal kuis
 const os = require('os'); // Modul bawaan untuk info sistem
 const startTime = new Date(); // Mencatat waktu bot pertama kali dijalankan
+const { exec } = require('child_process');
+const fs = require('fs');
 
 let sesiAbsen = {};
 const daftarKataKasar = [
@@ -375,77 +377,43 @@ _Bot siap melayani grup ini!_`);
         // ==========================================
         // 📥 FITUR DOWNLOADER (TikTok, IG, FB, YouTube)
         // ==========================================
-        else if (['!tiktok', '!ig', '!fb', '!youtube', '!yt'].includes(command)) {
-            if (args.length === 0) {
-                return msg.reply(`❌ Format salah!\nCara pakai: *${command} [link_video]*\nContoh: *${command} https://...*`);
-            }
+        else if (command === '!dl') {
+    const url = args[0];
+    if (!url) return msg.reply('❌ Masukkan link videonya! Contoh: *!dl https://...*');
 
-            const link = args[0];
-            
-            if (!link.startsWith('http')) {
-                return msg.reply('❌ Link tidak valid! Pastikan link diawali dengan http:// atau https://');
-            }
+    msg.reply('⏳ Sedang memproses video, mohon tunggu... (Proses ini butuh waktu tergantung durasi)');
 
-            msg.reply('⏳ Sedang mengambil video dari server, mohon tunggu sebentar...\n_(Catatan: Jika bot diam saja setelah ini, artinya ukuran video terlalu besar untuk WhatsApp)_');
+    const fileName = `video_${Date.now()}.mp4`;
+    const outputPath = `./${fileName}`;
 
-            try {
-                let videoUrl = '';
-                let captionText = '';
+    // Perintah sakti yt-dlp agar formatnya cocok untuk WhatsApp (H.264 + AAC)
+    // -f "mp4" memastikan kita ambil mp4
+    // --merge-output-format mp4 memastikan hasil akhir mp4
+    const cmd = `yt-dlp -f "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best" --merge-output-format mp4 -o "${outputPath}" "${url}"`;
 
-                if (command === '!tiktok') {
-                    // Menggunakan API TikWM (Sangat stabil bertahun-tahun)
-                    const response = await fetch(`https://www.tikwm.com/api/?url=${encodeURIComponent(link)}`);
-                    const data = await response.json();
-                    
-                    if (!data.data || !data.data.play) throw new Error('Video TikTok tidak ditemukan');
-                    
-                    videoUrl = data.data.play;
-                    captionText = `🎵 *TikTok Downloader*`;
-                } 
-                else if (command === '!ig') {
-                    // Menggunakan API Siputzx (Sangat stabil untuk saat ini)
-                    const response = await fetch(`https://api.siputzx.my.id/api/d/igdl?url=${encodeURIComponent(link)}`);
-                    const data = await response.json();
-                    
-                    if (!data.status || !data.data) throw new Error('Data API IG kosong');
-                    
-                    // Menggunakan Optional Chaining (?.) agar bot tidak crash jika format JSON berubah
-                    videoUrl = data.data?.[0]?.url || data.data?.url; 
-                    captionText = `📸 *Instagram Downloader*`;
-                }
-                else if (command === '!fb') {
-                    const response = await fetch(`https://api.siputzx.my.id/api/d/facebook?url=${encodeURIComponent(link)}`);
-                    const data = await response.json();
-                    
-                    if (!data.status || !data.data) throw new Error('Data API FB kosong');
-                    
-                    videoUrl = data.data?.urls?.[0]?.hd || data.data?.urls?.[0]?.sd || data.data?.[0]?.url || data.data?.url; 
-                    captionText = `📘 *Facebook Downloader*`;
-                }
-                else if (command === '!youtube' || command === '!yt') {
-                    const response = await fetch(`https://api.siputzx.my.id/api/d/ytmp4?url=${encodeURIComponent(link)}`);
-                    const data = await response.json();
-                    
-                    if (!data.status || !data.data || !data.data.dl) throw new Error('Data API YouTube kosong');
-                    
-                    videoUrl = data.data.dl;
-                    captionText = `📺 *YouTube Downloader*`;
-                }
-
-                // Memastikan link video benar-benar berhasil didapat sebelum dikirim
-                if (!videoUrl) throw new Error('URL Media gagal diekstrak dari JSON');
-
-                // Mengirim video ke grup
-                const media = await MessageMedia.fromUrl(videoUrl, { unsafeMime: true });
-                await client.sendMessage(msg.from, media, { caption: captionText });
-
-            } catch (error) {
-                // Mencetak error di terminal kamu agar gampang dicek
-                console.log(`[ERROR ${command.toUpperCase()}]:`, error.message || error);
-                
-                msg.reply('❌ Gagal mengunduh video.\n\n*Penyebab umum:*\n1. Akun pengunggah video di-private.\n2. Server API pihak ketiga sedang sibuk/down.\n3. Link URL salah format.');
-            }
+    exec(cmd, async (error, stdout, stderr) => {
+        if (error) {
+            console.error(`Error: ${error.message}`);
+            return msg.reply('❌ Gagal mendownload video. Pastikan link valid atau coba lagi nanti.');
         }
+
+        try {
+            // Mengirim file yang sudah didownload
+            const media = MessageMedia.fromFilePath(outputPath);
+            await client.sendMessage(msg.from, media, {
+                caption: '✅ Video berhasil didownload!',
+                sendMediaAsDocument: false // Kirim sebagai video biasa, bukan file dokumen
+            });
+
+            // Hapus file setelah dikirim agar tidak memenuhi penyimpanan VPS
+            fs.unlinkSync(outputPath);
+        } catch (err) {
+            console.error('Error saat mengirim file:', err);
+            msg.reply('❌ Video terlalu besar untuk dikirim via WhatsApp (Limit: 16-64MB).');
+            if (fs.existsSync(outputPath)) fs.unlinkSync(outputPath);
+        }
+    });
+}
 
         // ==========================================
         // 📋 SISTEM ABSENSI DINAMIS
