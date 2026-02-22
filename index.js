@@ -9,6 +9,7 @@ let playersData = {};
 let catatanGrup = {};
 const googleTTS = require('google-tts-api'); // Modul untuk Text-to-Speech
 const kumpulanQuotes = require('./quotes.js');
+const bankSoal = require('./bankSoal.js'); // Memanggil bank soal kuis
 
 let sesiAbsen = {};
 const daftarKataKasar = [
@@ -880,61 +881,40 @@ Teks yang harus diterjemahkan:
         }
 
         // 4. Game Tebak Hewan/Benda by Gemini AI
+        // ==========================================
+        // 🧠 GAME KUIS (DARI BANK SOAL LOKAL)
+        // ==========================================
         else if (command === '!kuis') {
             // Cek apakah masih ada soal yang belum terjawab di grup ini
             if (activeKuis[chat.id._serialized]) {
                 return msg.reply('❌ Masih ada kuis yang belum terjawab di grup ini! Jawab dulu atau tunggu waktunya habis.');
             }
 
-            msg.reply('⏳ AI Gemini sedang memikirkan soal yang sangat sulit, mohon tunggu...');
+            // Mengacak dan mengambil satu soal dari file bankSoal.js
+            const randomSoal = bankSoal[Math.floor(Math.random() * bankSoal.length)];
 
-            try {
-                // Memilih model Gemini
-                const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
-                
-                // Prompt sakti agar AI membalas dengan format yang mudah dibaca oleh bot
-                const prompt = `Kamu adalah juri game tebak-tebakan. Pikirkan satu nama HEWAN atau BENDA secara acak yang umum diketahui orang Indonesia.
-Berikan 3 ciri-ciri dari hewan/benda tersebut sebagai petunjuk. 
-ATURAN WAJIB: Balasanmu harus persis menggunakan format 2 baris ini:
-Jawaban: [nama benda/hewan]
-Soal: [ciri-ciri 1], [ciri-ciri 2], [ciri-ciri 3]`;
+            // Menyimpan data kuis ke memori grup ini
+            activeKuis[chat.id._serialized] = {
+                jawaban: randomSoal.jawaban,
+                reward: randomSoal.poin
+            };
 
-                const result = await model.generateContent(prompt);
-                const text = result.response.text();
+            // Mengirimkan pertanyaan ke grup
+            let pesanKuis = `🧠 *KUIS CERDAS CERMAT* 🧠\n\n`;
+            pesanKuis += `Pertanyaan:\n*${randomSoal.soal}*\n\n`;
+            pesanKuis += `Ketik langsung jawabannya di grup ini!\n`;
+            pesanKuis += `💰 _Hadiah: ${randomSoal.poin} Poin_ | ⏳ _Waktu: 60 Detik_`;
 
-                // Bot membaca balasan AI dan memisahkannya (Parsing)
-                const jawabanMatch = text.match(/Jawaban:\s*(.*)/i);
-                const soalMatch = text.match(/Soal:\s*([\s\S]*)/i);
+            msg.reply(pesanKuis);
 
-                if (jawabanMatch && soalMatch) {
-                    const jawabanKuis = jawabanMatch[1].trim();
-                    const petunjukKuis = soalMatch[1].trim();
-
-                    // Menyimpan data kuis ke memori
-                    activeKuis[chat.id._serialized] = {
-                        jawaban: jawabanKuis,
-                        reward: 50 // Hadiah poin jika benar
-                    };
-
-                    // Mengirimkan petunjuk ke grup
-                    msg.reply(`🧠 *KUIS GEMINI AI* 🧠\n\nTebak nama hewan atau benda berdasarkan ciri-ciri berikut:\n_*${petunjukKuis}*_\n\nKetik langsung jawabannya di grup ini!\n💰 _Hadiah: 50 Poin_ | ⏳ _Waktu: 60 Detik_`);
-
-                    // Membuat timer 60 detik (60000 ms)
-                    setTimeout(() => {
-                        // Mengecek apakah setelah 60 detik kuisnya masih ada (belum terjawab)
-                        if (activeKuis[chat.id._serialized] && activeKuis[chat.id._serialized].jawaban === jawabanKuis) {
-                            client.sendMessage(chat.id._serialized, `⏰ *WAKTU HABIS!*\n\nTidak ada yang berhasil menebak.\nJawabannya adalah: *${jawabanKuis.toUpperCase()}*`);
-                            delete activeKuis[chat.id._serialized]; // Hapus kuis
-                        }
-                    }, 60000);
-
-                } else {
-                    msg.reply('❌ AI Gemini memberikan format yang salah, coba ketik *!kuis* lagi.');
+            // Membuat timer 60 detik (60000 ms)
+            setTimeout(() => {
+                // Mengecek apakah setelah 60 detik kuisnya masih ada (belum terjawab)
+                if (activeKuis[chat.id._serialized] && activeKuis[chat.id._serialized].jawaban === randomSoal.jawaban) {
+                    client.sendMessage(chat.id._serialized, `⏰ *WAKTU HABIS!*\n\nTidak ada yang berhasil menebak.\nJawabannya adalah: *${randomSoal.jawaban.toUpperCase()}*`);
+                    delete activeKuis[chat.id._serialized]; // Hapus kuis dari memori
                 }
-            } catch (error) {
-                console.log("Error Gemini:", error);
-                msg.reply('❌ Gagal menghubungi server Google Gemini. Pastikan API Key valid.');
-            }
+            }, 60000);
         }
 
         // 3. Toko VIP: Beli Status Kebal (1000 Poin untuk 24 Jam)
