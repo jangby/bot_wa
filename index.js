@@ -2303,44 +2303,4 @@ else if (['!tagall', '!kick', '!promote', '!demote', '!tutupgrup', '!bukagrup', 
     }
 });
 
-// ==========================================
-// 👋 SISTEM AUTO-WELCOME & AUTO-LEAVE
-// ==========================================
-client.on('group_join', async (notification) => {
-    try {
-        const chat = await notification.getChat();
-        // Cek apakah fitur auto-welcome dimatikan di !fitur
-        if (disabledFeatures.includes('autowelcome')) return;
-
-        const contactIds = notification.recipientIds;
-        for (let userId of contactIds) {
-            let standardId = userId;
-            if (standardId.includes(':')) standardId = standardId.split(':')[0] + '@c.us';
-
-            const welcomeMsg = `🎉 Selamat datang *@${standardId.split('@')[0]}* di grup *${chat.name}*!\n\nJangan lupa intro, patuhi rules grup, dan ketik *!menu* untuk melihat daftar fitur bot ya! Selamat bergabung! 🥳`;
-            await chat.sendMessage(welcomeMsg, { mentions: [standardId] });
-        }
-    } catch (error) {
-        console.log("Error Welcome:", error);
-    }
-});
-
-client.on('group_leave', async (notification) => {
-    try {
-        const chat = await notification.getChat();
-        if (disabledFeatures.includes('autowelcome')) return;
-
-        const contactIds = notification.recipientIds;
-        for (let userId of contactIds) {
-            let standardId = userId;
-            if (standardId.includes(':')) standardId = standardId.split(':')[0] + '@c.us';
-
-            const leaveMsg = `👋 Yahh... *@${standardId.split('@')[0]}* telah keluar dari grup.\n\nSemoga sukses di luar sana! Terima kasih sudah pernah mampir. 🥀`;
-            await chat.sendMessage(leaveMsg, { mentions: [standardId] });
-        }
-    } catch (error) {
-        console.log("Error Leave:", error);
-    }
-});
-
 client.initialize();
