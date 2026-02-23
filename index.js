@@ -212,9 +212,19 @@ client.on('message', async (msg) => {
     const chat = await msg.getChat();
 
     // 1. Definisikan ID pengirim dulu agar bisa dicek sudo/owner-nya
+    // ==========================================
+    // 1. PERBAIKAN: METODE ID ANTI-ERROR & MULTI-DEVICE
+    // ==========================================
+    let standardSenderId = msg.author || msg.from; 
+    
+    // Hilangkan kode perangkat (misal :1 atau :2) agar ID selalu murni
+    if (standardSenderId.includes(':')) {
+        standardSenderId = standardSenderId.split(':')[0] + '@c.us';
+    }
+
     const senderContact = await msg.getContact();
-    const senderNumber = senderContact.number; 
-    const standardSenderId = `${senderNumber}@c.us`;
+    // Mengambil nomor WA dengan aman
+    const senderNumber = senderContact.number || standardSenderId.split('@')[0]; 
 
     const isPrivateChat = !chat.isGroup;
     const isSudo = sudoUsers.includes(standardSenderId);
@@ -1729,16 +1739,24 @@ else if (['!tagall', '!kick', '!promote', '!demote', '!tutupgrup', '!bukagrup', 
         if (!isBotAdmin) return msg.reply('❌ Bot harus Admin untuk menghapus pesan.');
         if (msg.mentionedIds.length > 0) {
             let idTarget = msg.mentionedIds[0];
+            
+            // Pastikan ID target juga bersih dari kode device
+            if (idTarget.includes(':')) {
+                idTarget = idTarget.split(':')[0] + '@c.us';
+            }
+
             let targetPlayer = getPlayer(idTarget);
             if (targetPlayer.kebalUntil > Date.now() || sudoUsers.includes(idTarget)) {
                 return msg.reply('⚠️ Anggota ini kebal/Owner!');
             }
+            
             if (!blacklistedUsers.includes(idTarget)) {
                 blacklistedUsers.push(idTarget);
             }
-            msg.reply('🔇 Berhasil diblacklist.');
+            
+            await chat.sendMessage(`🔇 Sah! Mulai sekarang semua pesan dari *@${idTarget.split('@')[0]}* akan otomatis saya hapus.`, { mentions: [idTarget] });
         } else {
-            msg.reply('⚠️ Tag orangnya!');
+            msg.reply('⚠️ Tag orangnya! Contoh: *!blacklist @Budi*');
         }
     }
 
