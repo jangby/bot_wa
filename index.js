@@ -1188,8 +1188,16 @@ _Bot siap melayani grup ini!_`);
         // 📥 FITUR DOWNLOADER (TikTok, IG, FB, YouTube)
         // ==========================================
         else if (command === '!dl') {
-    const url = args[0];
-    if (!url) return msg.reply('❌ Masukkan link videonya! Contoh: *!dl https://...*');
+            const url = args[0];
+            if (!url) return msg.reply('❌ Masukkan link videonya! Contoh: *!dl https://...*');
+
+            // --- TAMBAHKAN VALIDASI INI ---
+            // Hanya izinkan link http/https dan tolak karakter berbahaya (seperti petik, titik koma, dll)
+            const urlRegex = /^https?:\/\/[^\s"';|]+$/;
+            if (!urlRegex.test(url)) {
+                return msg.reply('❌ Link tidak valid atau mengandung karakter terlarang!');
+            }
+            // ------------------------------
 
     msg.reply('⏳ Sedang memproses video, mohon tunggu... (Proses ini butuh waktu tergantung durasi)');
 
@@ -1912,6 +1920,23 @@ Teks yang harus diterjemahkan:
                 console.log("Error Tebak Gambar:", error);
                 msg.reply('❌ Gagal mengambil soal tebak gambar. Pastikan bot terkoneksi internet.');
                 delete activeTebakGambar[chat.id._serialized]; // Mencegah bug game nyangkut
+            }
+        }
+
+        else if (command === '!hint' || command === '!bantuan') {
+            if (activeTebakGambar[chat.id._serialized]) {
+                const jawaban = activeTebakGambar[chat.id._serialized].jawaban;
+                
+                // Membuat teks sensor (K U C I N G -> K _ _ _ _ G)
+                let petunjuk = jawaban[0]; // Huruf pertama
+                for (let i = 1; i < jawaban.length - 1; i++) {
+                    petunjuk += jawaban[i] === ' ' ? '   ' : ' _ '; // Biarkan spasi tetap spasi
+                }
+                petunjuk += jawaban[jawaban.length - 1]; // Huruf terakhir
+
+                return msg.reply(`💡 *BANTUAN TEBAK GAMBAR*\n\nPetunjuk jawaban:\n*${petunjuk.toUpperCase()}*`);
+            } else {
+                return msg.reply('❌ Sedang tidak ada game tebak gambar yang berjalan.');
             }
         }
 
