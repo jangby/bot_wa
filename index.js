@@ -214,25 +214,15 @@ client.on('message_create', async (msg) => {
     // ==========================================
     // 1. SISTEM ID PENGIRIM (BULLETPROOF)
     // ==========================================
-    let standardSenderId;
-
-    // Jika pesan dikirim oleh nomor bot itu sendiri
-    if (msg.fromMe) {
-        standardSenderId = client.info.wid._serialized;
-    } else {
-        // msg.author untuk chat grup, msg.from untuk chat pribadi
-        standardSenderId = msg.author || msg.from; 
-    }
-
-    // Bersihkan ID dari kode device (wajib!)
+    let standardSenderId = msg.author || msg.from; 
+    
+    // Membersihkan ID dari kode perangkat (misal :1, :2)
     if (standardSenderId && standardSenderId.includes(':')) {
         standardSenderId = standardSenderId.split(':')[0] + '@c.us';
     }
 
     const senderNumber = standardSenderId.split('@')[0]; 
     const isPrivateChat = !chat.isGroup;
-
-    // Tarik kontak pengirim (dipindah ke sini agar tidak error)
     const senderContact = await msg.getContact();
 
     // ==========================================
@@ -244,18 +234,15 @@ client.on('message_create', async (msg) => {
     let isSenderAdmin = false;
 
     if (chat.isGroup) {
-        const participants = chat.participants;
-        
-        // Cek Otoritas Bot (Gunakan _serialized agar lebih konsisten)
-        let botId = client.info.wid._serialized;
-        if (botId.includes(':')) botId = botId.split(':')[0] + '@c.us';
-        const bot = participants.find(p => p.id._serialized === botId);
-        isBotAdmin = bot?.isAdmin || bot?.isSuperAdmin;
+            // PERBAIKAN: Bersihkan ID bot dari kode device (:1) agar match dengan daftar anggota
+            const botNumber = client.info.wid.user.split(':')[0];
+            const bot = participants.find(p => p.id.user === botNumber);
+            isBotAdmin = bot?.isAdmin || bot?.isSuperAdmin;
 
-        // Cek Otoritas Pengirim
-        const sender = participants.find(p => p.id._serialized === standardSenderId);
-        isSenderAdmin = sender?.isAdmin || sender?.isSuperAdmin;
-    }
+            // Pengecekan Pengirim Admin
+            const sender = participants.find(p => p.id.user === senderNumber);
+            isSenderAdmin = sender?.isAdmin || sender?.isSuperAdmin;
+        }
 
     // [OPSIONAL] Log debugging buat kamu di terminal biar tau kalau ada yang error
     if (msg.body.startsWith('!blacklist')) {
