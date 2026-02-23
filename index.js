@@ -485,7 +485,8 @@ client.on('message_create', async (msg) => {
                 let hadiah = activeTebakGambar[chat.id._serialized].poin;
                 player.points += hadiah;
 
-                msg.reply(`🎉 *TEBAKAN BENAR!* 🎉\n\nSelamat *@${senderContact.id.user}*, jawabannya memang *${jawabanBenar.toUpperCase()}*!\nKamu berhasil mendapatkan *+${hadiah} Poin*.\n💰 Saldo kamu sekarang: *${player.points}*`, { mentions: [standardSenderId] });
+                // PERBAIKAN: Menggunakan chat.sendMessage agar bot tidak error saat me-mention orang
+                chat.sendMessage(`🎉 *TEBAKAN BENAR!* 🎉\n\nSelamat *@${senderContact.id.user}*, jawabannya memang *${jawabanBenar.toUpperCase()}*!\nKamu berhasil mendapatkan *+${hadiah} Poin*.\n💰 Saldo kamu sekarang: *${player.points}*`, { mentions: [standardSenderId] });
                 
                 // Hapus sesi game karena sudah tertebak
                 delete activeTebakGambar[chat.id._serialized];
