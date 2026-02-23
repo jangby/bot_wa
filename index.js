@@ -20,6 +20,7 @@ let activeTTT = {};
 let pendingTopup = {}; // Menyimpan tiket top up yang menunggu verifikasi
 let inventory = {};    // Menyimpan tas/barang milik member
 let activeLakban = {}; // Menyimpan status efek item lakban hitam
+let activeTameng = {};
 // Variabel untuk menyimpan puluhan ribu kata di RAM (sangat ringan karena menggunakan Set)
 let kamusIndonesia = new Set();
 
@@ -1997,9 +1998,13 @@ Teks yang harus diterjemahkan:
         else if (command === '!store' || command === '!toko') {
             let katalog = `🛒 *TOKO POIN ANGKATAN* 🛒\n_Habiskan poinmu untuk membeli item menarik!_\n\n`;
             katalog += `*1. Tiket Gelar (🎟️ tiketgelar)* - 300 Poin\n_Bikin julukan/gelarmu sendiri tanpa perlu Admin._\n`;
-            katalog += `*2. Lakban Hitam (🤐 lakban)* - 200 Poin\n_Bungkam temanmu! Pesan dia di grup akan dihapus bot selama 3 Menit._\n`;
-            katalog += `*3. Sarung Tangan Copet (🕵️ copet)* - 100 Poin\n_Curi poin teman secara acak. Awas, kalau gagal kamu yang kena denda!_\n\n`;
-            katalog += `👉 Cara beli: *!beli [nama_item]*\nContoh: *!beli lakban*`;
+            katalog += `*2. Santet (🎭 santet) [BARU]* - 250 Poin\n_Ubah gelar temanmu jadi memalukan secara paksa!_\n`;
+            katalog += `*3. Lakban Hitam (🤐 lakban)* - 200 Poin\n_Pesan chat target di grup akan dihapus bot selama 3 Menit._\n`;
+            katalog += `*4. Tameng (🛡️ tameng) [BARU]* - 200 Poin\n_Kebal 1x dari serangan Copet, Lakban, atau Santet._\n`;
+            katalog += `*5. Gacha Box (📦 gacha) [BARU]* - 150 Poin\n_Buka kotak misteri. Bisa zonk, bisa dapat Jackpot 1.000 Poin!_\n`;
+            katalog += `*6. Pelet Cinta (💘 pelet) [BARU]* - 150 Poin\n_Bikin pengumuman kalau target naksir berat sama kamu._\n`;
+            katalog += `*7. Sarung Tangan Copet (🕵️ copet)* - 100 Poin\n_Curi poin teman! Kalau gagal, kamu yang didenda._\n\n`;
+            katalog += `👉 Cara beli: *!beli [nama_item]*\nContoh: *!beli gacha*`;
             
             msg.reply(katalog);
         }
@@ -2008,7 +2013,8 @@ Teks yang harus diterjemahkan:
             if (args.length === 0) return msg.reply('❌ Tulis nama item yang mau dibeli!\nContoh: *!beli lakban*');
             const itemDibeli = args[0].toLowerCase();
             
-            const daftarHarga = { 'tiketgelar': 300, 'lakban': 200, 'copet': 100 };
+            // Daftar harga semua item
+            const daftarHarga = { 'tiketgelar': 300, 'santet': 250, 'lakban': 200, 'tameng': 200, 'gacha': 150, 'pelet': 150, 'copet': 100 };
             
             if (!daftarHarga[itemDibeli]) return msg.reply('❌ Item tidak ditemukan di Toko! Cek katalog dengan *!store*.');
             
@@ -2017,15 +2023,13 @@ Teks yang harus diterjemahkan:
             
             if (player.points < harga) return msg.reply(`💸 Poinmu tidak cukup! Harga ${itemDibeli} adalah ${harga} Poin.\nSaldo kamu: *${player.points}*`);
             
-            // Kurangi poin
             player.points -= harga;
             
-            // Masukkan item ke tas
             if (!inventory[standardSenderId]) inventory[standardSenderId] = {};
             if (!inventory[standardSenderId][itemDibeli]) inventory[standardSenderId][itemDibeli] = 0;
             inventory[standardSenderId][itemDibeli] += 1;
             
-            msg.reply(`✅ *PEMBELIAN SUKSES!*\nKamu berhasil membeli 1x *${itemDibeli}*.\nKetik *!tas* untuk melihat barang bawaanmu.`);
+            msg.reply(`✅ *PEMBELIAN SUKSES!*\nKamu berhasil membeli 1x *${itemDibeli.toUpperCase()}*.\nKetik *!tas* untuk melihat barang bawaanmu.`);
         }
 
         else if (command === '!tas' || command === '!inventory') {
@@ -2036,12 +2040,12 @@ Teks yang harus diterjemahkan:
             for (let item in tasUser) {
                 if (tasUser[item] > 0) isiTas += `- ${item} : *${tasUser[item]} buah*\n`;
             }
-            isiTas += `\n👉 Cara pakai: *!pakai [nama_item] [@user]*`;
+            isiTas += `\n👉 Cara pakai (Target): *!pakai lakban @Doni*\n👉 Cara pakai (Diri sendiri): *!pakai gacha*`;
             msg.reply(isiTas);
         }
 
         else if (command === '!pakai') {
-            if (args.length === 0) return msg.reply('❌ Pilih item yang mau dipakai!\nContoh: *!pakai lakban @Doni*');
+            if (args.length === 0) return msg.reply('❌ Pilih item yang mau dipakai!\nContoh: *!pakai lakban @Doni* atau *!pakai gacha*');
             
             let itemDipakai = args[0].toLowerCase();
             let tasUser = inventory[standardSenderId];
@@ -2050,40 +2054,55 @@ Teks yang harus diterjemahkan:
                 return msg.reply(`❌ Kamu tidak punya *${itemDipakai}* di dalam tas! Beli dulu di *!store*.`);
             }
 
-            // --- LAKBAN HITAM ---
+            // Fungsi Pengecek Tameng & Kebal
+            const cekPertahanan = (targetId) => {
+                let targetPlayer = getPlayer(targetId);
+                // Cek status Kebal VIP / Owner
+                if (targetPlayer.kebalUntil > Date.now() || sudoUsers.includes(targetId)) return 'kebal';
+                // Cek status Tameng dari Item
+                if (activeTameng[targetId]) {
+                    delete activeTameng[targetId]; // Tameng langsung pecah setelah menahan 1 serangan
+                    return 'tameng';
+                }
+                return 'tembus';
+            };
+
+            // --- 1. LAKBAN HITAM ---
             if (itemDipakai === 'lakban') {
                 if (!chat.isGroup) return msg.reply('❌ Item ini hanya bisa dipakai di grup!');
                 if (msg.mentionedIds.length === 0) return msg.reply('❌ Tag orang yang mau dilakban!\nContoh: *!pakai lakban @Doni*');
                 
                 const targetId = msg.mentionedIds[0];
+                tasUser[itemDipakai] -= 1; // Item selalu hangus dipakai
                 
-                // Cek apakah target punya status kebal
-                let targetPlayer = getPlayer(targetId);
-                if (targetPlayer.kebalUntil > Date.now() || sudoUsers.includes(targetId)) {
-                    tasUser[itemDipakai] -= 1; // Item tetap hangus
-                    return msg.reply('⚠️ *GAGAL LAKBAN!* Target memakai ilmu Kebal VIP atau Owner! Item lakbanmu hangus.');
-                }
+                let statusPertahanan = cekPertahanan(targetId);
+                if (statusPertahanan === 'kebal') return msg.reply('⚠️ *GAGAL!* Target memakai ilmu Kebal VIP/Owner!');
+                if (statusPertahanan === 'tameng') return chat.sendMessage(`🛡️ *TINGG! SERANGAN DITANGKIS!* 🛡️\n\nUsaha lakban dari *@${senderContact.id.user}* GAGAL karena *@${targetId.split('@')[0]}* memakai *Tameng*!\nTameng target kini hancur berkeping-keping.`, { mentions: [targetId, standardSenderId] });
 
-                // Kurangi item dari tas dan aktifkan efek 3 Menit (3 * 60 * 1000 ms)
-                tasUser[itemDipakai] -= 1;
-                activeLakban[targetId] = Date.now() + 180000;
-                
-                await chat.sendMessage(`🤐 *CRAAAT!* 🤐\n\nMulut *@${targetId.split('@')[0]}* berhasil dilakban hitam oleh *@${senderContact.id.user}*!\n\nSelama *3 Menit ke depan*, semua pesan dia di grup ini akan otomatis dihapus oleh bot!`, { mentions: [targetId, standardSenderId] });
+                activeLakban[targetId] = Date.now() + 180000; // 3 Menit
+                await chat.sendMessage(`🤐 *CRAAAT!* 🤐\n\nMulut *@${targetId.split('@')[0]}* berhasil dilakban hitam oleh *@${senderContact.id.user}*!\nSelama *3 Menit ke depan*, chat dia di grup ini akan dihapus bot!`, { mentions: [targetId, standardSenderId] });
             }
             
-            // --- TIKET GELAR ---
-            else if (itemDipakai === 'tiketgelar') {
-                if (args.length < 2) return msg.reply('❌ Masukkan nama gelar yang kamu inginkan!\nContoh: *!pakai tiketgelar Raja Bucin*');
+            // --- 2. SANTET ---
+            else if (itemDipakai === 'santet') {
+                if (!chat.isGroup) return msg.reply('❌ Item ini hanya bisa dipakai di grup!');
+                if (msg.mentionedIds.length === 0) return msg.reply('❌ Tag orang yang mau disantet!\nContoh: *!pakai santet @Doni*');
                 
-                const namaGelar = args.slice(1).join(' ');
+                const targetId = msg.mentionedIds[0];
+                tasUser[itemDipakai] -= 1; 
+
+                let statusPertahanan = cekPertahanan(targetId);
+                if (statusPertahanan === 'kebal') return msg.reply('⚠️ *GAGAL!* Target memiliki aura Kebal VIP/Owner!');
+                if (statusPertahanan === 'tameng') return chat.sendMessage(`🛡️ *TINGG! SANTET MANTUL!* 🛡️\n\nSantet dari *@${senderContact.id.user}* berhasil ditahan oleh *Tameng* milik *@${targetId.split('@')[0]}*!\nTameng hancur, target selamat dari malu.`, { mentions: [targetId, standardSenderId] });
+
+                const gelarBuruk = ["Beban Grup", "Wibu Nolep", "Tukang Ngutang", "Jomblo Karatan", "Mandi Sebulan Sekali", "Buronan Pinjol", "Kang Ghosting", "Suka Ngotong Upil"];
+                const santetRandom = gelarBuruk[Math.floor(Math.random() * gelarBuruk.length)];
                 
-                tasUser[itemDipakai] -= 1;
-                gelarAngkatan[standardSenderId] = namaGelar; // Memasukkan ke database gelar
-                
-                msg.reply(`👑 *GELAR BARU!*\n\nSelamat! Kamu resmi menggunakan tiket untuk mengubah gelarmu menjadi:\n*${namaGelar}*`);
+                gelarAngkatan[targetId] = santetRandom;
+                await chat.sendMessage(`👺 *DUKUN BERTINDAK!* 👺\n\n*@${senderContact.id.user}* mengirimkan santet ke *@${targetId.split('@')[0]}*!\n\nGelar target sekarang dikutuk menjadi:\n👉 *${santetRandom}*`, { mentions: [targetId, standardSenderId] });
             }
 
-            // --- COPET ---
+            // --- 3. SARUNG TANGAN COPET ---
             else if (itemDipakai === 'copet') {
                 if (!chat.isGroup) return msg.reply('❌ Item ini hanya bisa dipakai di grup!');
                 if (msg.mentionedIds.length === 0) return msg.reply('❌ Tag orang yang mau dicopet!\nContoh: *!pakai copet @Budi*');
@@ -2091,30 +2110,84 @@ Teks yang harus diterjemahkan:
                 const targetId = msg.mentionedIds[0];
                 if (targetId === standardSenderId) return msg.reply('❌ Masa nyopet kantong sendiri?');
 
-                let targetPlayer = getPlayer(targetId);
+                tasUser[itemDipakai] -= 1; 
                 let myPlayer = getPlayer(standardSenderId);
 
-                tasUser[itemDipakai] -= 1; // Kurangi item
+                let statusPertahanan = cekPertahanan(targetId);
+                if (statusPertahanan === 'kebal') return msg.reply('⚠️ *GAGAL!* Target adalah VIP/Owner, dompetnya digembok!');
+                if (statusPertahanan === 'tameng') return chat.sendMessage(`🛡️ *PLAKK! TANGAN DITEPIS!* 🛡️\n\nUsaha copet *@${senderContact.id.user}* digagalkan oleh *Tameng* milik *@${targetId.split('@')[0]}*!\nTameng hancur, dompet target aman.`, { mentions: [targetId, standardSenderId] });
 
-                // Peluang 50% Berhasil, 50% Gagal
-                const isBerhasil = Math.random() > 0.5;
+                let targetPlayer = getPlayer(targetId);
+                const isBerhasil = Math.random() > 0.5; // 50% Peluang berhasil
 
                 if (isBerhasil) {
-                    // Berhasil nyopet 20 - 50 Poin
-                    let hasilCopet = Math.floor(Math.random() * 31) + 20;
-                    
-                    // Jika poin target kurang dari hasil copet, ambil semua sisanya saja
+                    let hasilCopet = Math.floor(Math.random() * 31) + 20; // Copet 20 - 50 Poin
                     if (targetPlayer.points < hasilCopet) hasilCopet = targetPlayer.points;
                     
                     targetPlayer.points -= hasilCopet;
                     myPlayer.points += hasilCopet;
                     
-                    await chat.sendMessage(`🕵️‍♂️ *COPET BERHASIL!* 🕵️‍♂️\n\nKamu mengendap-endap dan berhasil mencuri *${hasilCopet} Poin* dari kantong *@${targetId.split('@')[0]}*!`, { mentions: [targetId] });
+                    await chat.sendMessage(`🕵️‍♂️ *COPET BERHASIL!* 🕵️‍♂️\n\n*@${senderContact.id.user}* mengendap-endap dan mencuri *${hasilCopet} Poin* dari kantong *@${targetId.split('@')[0]}*!`, { mentions: [targetId, standardSenderId] });
                 } else {
-                    // Gagal, kena denda 30 Poin
-                    myPlayer.points -= 30;
-                    await chat.sendMessage(`🚨 *TETOOOT! KETAHUAN!* 🚨\n\nUsaha copetmu ke *@${targetId.split('@')[0]}* gagal total! Kamu malah digebukin warga dan didenda *-30 Poin*.`, { mentions: [targetId] });
+                    myPlayer.points -= 30; // Denda gagal
+                    await chat.sendMessage(`🚨 *TETOOOT! KETAHUAN WAHAY!* 🚨\n\nUsaha copet *@${senderContact.id.user}* ke *@${targetId.split('@')[0]}* gagal total! Kamu digebukin warga dan didenda *-30 Poin*.`, { mentions: [targetId, standardSenderId] });
                 }
+            }
+
+            // --- 4. PELET CINTA ---
+            else if (itemDipakai === 'pelet') {
+                if (!chat.isGroup) return msg.reply('❌ Item ini hanya bisa dipakai di grup!');
+                if (msg.mentionedIds.length === 0) return msg.reply('❌ Tag orang yang mau dipelet!\nContoh: *!pakai pelet @Siti*');
+                
+                const targetId = msg.mentionedIds[0];
+                tasUser[itemDipakai] -= 1; 
+
+                await chat.sendMessage(`💘 *CIEEEE ADA YANG NAKSIR!* 💘\n\nPengumuman buat satu grup! Ternyata diam-diam *@${targetId.split('@')[0]}* itu naksir berat loh sama *@${senderContact.id.user}*!\n\n_Udah buruan jadian aja sana!_ 👩‍❤️‍👨`, { mentions: [targetId, standardSenderId] });
+            }
+
+            // --- 5. TIKET GELAR ---
+            else if (itemDipakai === 'tiketgelar') {
+                if (args.length < 2) return msg.reply('❌ Masukkan nama gelar yang kamu inginkan!\nContoh: *!pakai tiketgelar Raja Bucin*');
+                const namaGelar = args.slice(1).join(' ');
+                
+                tasUser[itemDipakai] -= 1;
+                gelarAngkatan[standardSenderId] = namaGelar; 
+                msg.reply(`👑 *GELAR BARU!*\n\nSelamat! Kamu resmi menggunakan tiket untuk mengubah gelarmu menjadi:\n*${namaGelar}*`);
+            }
+
+            // --- 6. TAMENG ANTI-JAHIL ---
+            else if (itemDipakai === 'tameng') {
+                if (activeTameng[standardSenderId]) return msg.reply('🛡️ Kamu masih memiliki Tameng yang aktif! Tidak perlu pakai lagi.');
+                
+                tasUser[itemDipakai] -= 1;
+                activeTameng[standardSenderId] = true; // Tameng aktif sampai dihancurkan
+                msg.reply(`🛡️ *TAMENG DIAKTIFKAN!* 🛡️\n\nAura pelindung menyelimutimu. Kamu sekarang kebal dari 1x serangan Lakban, Copet, atau Santet!`);
+            }
+
+            // --- 7. GACHA BOX ---
+            else if (itemDipakai === 'gacha') {
+                tasUser[itemDipakai] -= 1;
+                let myPlayer = getPlayer(standardSenderId);
+                const gachaRoll = Math.floor(Math.random() * 100) + 1; // Roll 1 - 100
+                
+                let hadiah = 0;
+                let teksGacha = "";
+
+                if (gachaRoll <= 40) {
+                    teksGacha = "🗑️ *ZONKKK!* Kotaknya kosong melompong. Kamu apes banget!";
+                } else if (gachaRoll <= 75) {
+                    hadiah = 150;
+                    teksGacha = "💵 *LUMAYAN!* Kamu dapat 150 Poin (Balik modal boss).";
+                } else if (gachaRoll <= 95) {
+                    hadiah = 300;
+                    teksGacha = "💰 *MANTAP!* Kamu menemukan 300 Poin di dalam kotak!";
+                } else {
+                    hadiah = 1000;
+                    teksGacha = "🎰 *JACKPOT SULTAN!!!* 🎰\n\nGila hoki banget! Kamu mendapatkan *1.000 POIN* dari Gacha Box!";
+                }
+
+                myPlayer.points += hadiah;
+                msg.reply(`📦 *MEMBUKA GACHA BOX...*\n\n${teksGacha}\n\n💳 Saldo terbarumu: *${myPlayer.points} Poin*`);
             }
         }
 
