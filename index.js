@@ -332,17 +332,17 @@ client.on('message_create', async (msg) => {
         // ==========================================
         // 💎 SISTEM VERIFIKASI PREMIUM OLEH OWNER
         // ==========================================
-        // Jika ini di chat pribadi, pengirimnya Owner, dan dia me-reply pesan
         if (isPrivateChat && isSudo && msg.hasQuotedMsg) {
             const quotedMsg = await msg.getQuotedMessage();
+            const tiketId = quotedMsg.id.id; // PERBAIKAN: Ambil ID uniknya saja (Hex Code)
             
-            // Cek apakah pesan yang di-reply adalah tiket verifikasi dari bot
-            if (quotedMsg.fromMe && pendingPremium[quotedMsg.id._serialized]) {
-                const data = pendingPremium[quotedMsg.id._serialized];
+            // Cek apakah ada tiket pending dengan ID unik tersebut
+            if (quotedMsg.fromMe && pendingPremium[tiketId]) {
+                const data = pendingPremium[tiketId];
                 const replyText = msg.body.trim().toUpperCase();
                 
                 if (replyText === 'YA') {
-                    // Beri akses Premium selama 1 Jam (60 menit x 60 detik x 1000 milidetik)
+                    // Beri akses Premium selama 1 Jam
                     premiumTTS[data.userId] = Date.now() + (60 * 60 * 1000); 
                     
                     // Kirim notifikasi ke grup
@@ -350,17 +350,14 @@ client.on('message_create', async (msg) => {
                     
                     // Balas ke Owner
                     msg.reply('✅ Berhasil verifikasi. User telah diupgrade ke Premium TTS selama 1 Jam.');
-                    delete pendingPremium[quotedMsg.id._serialized]; // Hapus tiket
-                    return; // Stop proses agar tidak lanjut ke bawah
+                    delete pendingPremium[tiketId]; // Hapus tiket
+                    return; 
                 } 
                 else if (replyText === 'TIDAK') {
-                    // Kirim notifikasi penolakan ke grup
                     await client.sendMessage(data.groupId, `❌ Mohon maaf @${data.userId.split('@')[0]}, pembayaran *Premium TTS* kamu DITOLAK oleh Owner. Pastikan bukti transfer valid!`, { mentions: [data.userId] });
-                    
-                    // Balas ke Owner
                     msg.reply('❌ Pembayaran ditolak. Notifikasi telah dikirim ke grup.');
-                    delete pendingPremium[quotedMsg.id._serialized]; // Hapus tiket
-                    return; // Stop proses
+                    delete pendingPremium[tiketId]; 
+                    return; 
                 }
             }
         }
@@ -1189,15 +1186,15 @@ _Bot siap melayani grup ini!_`);
 
                 try {
                     const media = await msg.downloadMedia();
-                    const ownerId = sudoUsers[0]; // Mengirim ke Owner pertama di daftar Sudo
+                    const ownerId = sudoUsers[0]; 
                     
                     const captionToOwner = `💎 *PERMINTAAN PREMIUM TTS* 💎\n\nNama: ${namaPembeli}\nNomor: ${senderNumber}\nGrup: ${chat.name}\n\n_Silakan *Reply (Balas)* pesan ini dengan ketik *YA* untuk menerima, atau *TIDAK* untuk menolak._`;
                     
                     // Mengirim foto bukti ke DM Owner
                     const ownerMsg = await client.sendMessage(ownerId, media, { caption: captionToOwner });
                     
-                    // Mencatat ID Pesan tersebut ke dalam tiket pending
-                    pendingPremium[ownerMsg.id._serialized] = {
+                    // PERBAIKAN: Simpan pakai ID unik (id.id) agar pasti terbaca
+                    pendingPremium[ownerMsg.id.id] = {
                         userId: standardSenderId,
                         groupId: chat.id._serialized
                     };
