@@ -14,6 +14,8 @@ const os = require('os'); // Modul bawaan untuk info sistem
 const startTime = new Date(); // Mencatat waktu bot pertama kali dijalankan
 const { exec } = require('child_process');
 const fs = require('fs');
+let activeSambungKata = {};
+const kataAwalSambungKata = ["makan", "minum", "tidur", "kucing", "sepatu", "botol", "gelas", "buku", "pensil", "kertas"];
 const sudoUsers = [
     '6285136468097@c.us',
     '6285182484981@c.us',
@@ -443,6 +445,45 @@ client.on('message_create', async (msg) => {
                 
                 // Menghentikan kode di sini agar bot tidak mengira ini perintah lain
                 return; 
+            }
+        }
+
+        // ==========================================
+        // 🗣️ SISTEM PENGECEK JAWABAN SAMBUNG KATA
+        // ==========================================
+        if (activeSambungKata[chat.id._serialized] && !msg.fromMe && !msg.body.startsWith('!')) {
+            const game = activeSambungKata[chat.id._serialized];
+            const jawaban = msg.body.trim().toLowerCase();
+
+            // Aturan 1: Hanya boleh 1 kata (tidak boleh ada spasi)
+            if (!jawaban.includes(' ')) {
+                // Aturan 2: Huruf depan harus sesuai dengan huruf terakhir kata sebelumnya
+                if (jawaban.startsWith(game.lastLetter)) {
+                    
+                    // Aturan 3: Minimal 3 huruf (mencegah curang ngetik "aa", "bb")
+                    if (jawaban.length < 3) {
+                        msg.reply('⚠️ Curang! Kata minimal harus 3 huruf.');
+                        return;
+                    }
+
+                    // Aturan 4: Kata belum pernah dipakai di sesi ini
+                    if (game.usedWords.includes(jawaban)) {
+                        msg.reply(`⚠️ Kata *${jawaban.toUpperCase()}* sudah dipakai! Cari kata lain.`);
+                        return;
+                    }
+
+                    // JIKA SEMUA SYARAT TERPENUHI (JAWABAN BENAR)
+                    let player = getPlayer(standardSenderId);
+                    player.points += 10; // Memberikan 10 Poin
+
+                    game.currentWord = jawaban;
+                    game.lastLetter = jawaban.slice(-1); // Mengambil huruf paling belakang
+                    game.usedWords.push(jawaban);
+
+                    // Kirim notifikasi benar dan lanjut ke huruf berikutnya
+                    await chat.sendMessage(`✅ *BENAR!* *@${senderContact.id.user}* (+10 Poin)\n\nKata selanjutnya berawalan huruf: *${game.lastLetter.toUpperCase()}*`, { mentions: [standardSenderId] });
+                    return; 
+                }
             }
         }
 
@@ -1686,6 +1727,48 @@ Teks yang harus diterjemahkan:
                 player.points -= taruhan;
                 msg.reply(`❌ *YAHH SALAH! ANGKA RAHASIA ADALAH ${angkaRahasia}!*\n\nKamu kehilangan *-${taruhan} Poin*.\n💸 Saldomu sekarang: *${player.points}*`);
             }
+        }
+
+        // ==========================================
+        // 🗣️ GAME SAMBUNG KATA
+        // ==========================================
+        else if (command === '!sambungkata') {
+            if (!chat.isGroup) return msg.reply('❌ Game ini hanya bisa dimainkan di dalam grup!');
+            
+            // Cek apakah game sudah berjalan di grup ini
+            if (activeSambungKata[chat.id._serialized]) {
+                const gameBerjalan = activeSambungKata[chat.id._serialized];
+                return msg.reply(`⚠️ Game masih berjalan!\nAyo sambung kata yang berawalan huruf: *${gameBerjalan.lastLetter.toUpperCase()}*`);
+            }
+
+            // Memilih satu kata acak untuk memulai
+            const kataRandom = kataAwalSambungKata[Math.floor(Math.random() * kataAwalSambungKata.length)];
+            const hurufTerakhir = kataRandom.slice(-1).toLowerCase();
+
+            // Menyimpan state/status permainan ke memori
+            activeSambungKata[chat.id._serialized] = {
+                currentWord: kataRandom,
+                lastLetter: hurufTerakhir,
+                usedWords: [kataRandom.toLowerCase()]
+            };
+
+            let pesanMulai = `🎮 *GAME SAMBUNG KATA DIMULAI!* 🎮\n\n`;
+            pesanMulai += `Kata pertama: *${kataRandom.toUpperCase()}*\n`;
+            pesanMulai += `👉 Silakan balas dengan kata yang berawalan huruf *${hurufTerakhir.toUpperCase()}*\n\n`;
+            pesanMulai += `_Siapa cepat dia dapat poin! Ketik *!nyerah* untuk menghentikan game._`;
+
+            msg.reply(pesanMulai);
+        }
+
+        else if (command === '!nyerah' || command === '!stopsambungkata') {
+            if (!activeSambungKata[chat.id._serialized]) {
+                return msg.reply('❌ Tidak ada game Sambung Kata yang sedang berjalan.');
+            }
+
+            const totalKata = activeSambungKata[chat.id._serialized].usedWords.length;
+            delete activeSambungKata[chat.id._serialized]; // Hapus game dari memori
+
+            msg.reply(`🏳️ *GAME DIHENTIKAN* 🏳️\n\nKalian menyerah! Total kata yang berhasil disambung pada sesi ini adalah: *${totalKata} kata*.`);
         }
 
         // 4. Game Tebak Hewan/Benda by Gemini AI
