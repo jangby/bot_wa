@@ -1876,7 +1876,7 @@ Teks yang harus diterjemahkan:
 
             try {
                 // Mengambil database tebak gambar dari repository publik
-                const response = await fetch('https://raw.githubusercontent.com/BochilGaming/games-wabot/master/data/tebakgambar.json');
+                const response = await fetch('https://raw.githubusercontent.com/BochilTeam/database/master/games/tebakgambar.json');
                 const data = await response.json();
                 
                 // Memilih satu soal secara acak
