@@ -241,16 +241,12 @@ client.on('message', async (msg) => {
         let isSenderAdmin = false;
 
         if (chat.isGroup) {
-            const botId = `${client.info.wid.user}@c.us`; 
-            const bot = participants.find(p => p.id._serialized === botId);
+            // Pengecekan Bot Admin menggunakan id.user (Mengambil angka WA-nya saja)
+            const bot = participants.find(p => p.id.user === client.info.wid.user);
             isBotAdmin = bot?.isAdmin || bot?.isSuperAdmin;
 
-            // Memastikan pencarian jabatan Admin Grup juga kebal dari Multi-Device
-            const sender = participants.find(p => {
-                let partId = p.id._serialized;
-                if (partId.includes(':')) partId = partId.split(':')[0] + '@c.us';
-                return partId === standardSenderId;
-            });
+            // Pengecekan Pengirim Admin menggunakan id.user
+            const sender = participants.find(p => p.id.user === senderNumber);
             isSenderAdmin = sender?.isAdmin || sender?.isSuperAdmin;
         }
 
