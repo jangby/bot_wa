@@ -14,6 +14,7 @@ const os = require('os'); // Modul bawaan untuk info sistem
 const startTime = new Date(); // Mencatat waktu bot pertama kali dijalankan
 const { exec } = require('child_process');
 const fs = require('fs');
+let activeTebakGambar = {};
 let activeSambungKata = {};
 // Variabel untuk menyimpan puluhan ribu kata di RAM (sangat ringan karena menggunakan Set)
 let kamusIndonesia = new Set();
@@ -467,6 +468,27 @@ client.on('message_create', async (msg) => {
                 delete activeKuis[chat.id._serialized];
                 
                 // Menghentikan kode di sini agar bot tidak mengira ini perintah lain
+                return; 
+            }
+        }
+
+        // ==========================================
+        // 🖼️ SISTEM PENGECEK JAWABAN TEBAK GAMBAR
+        // ==========================================
+        if (activeTebakGambar[chat.id._serialized] && !msg.fromMe && !msg.body.startsWith('!')) {
+            const jawabanBenar = activeTebakGambar[chat.id._serialized].jawaban;
+            const tebakanUser = msg.body.trim().toLowerCase();
+            
+            // Mengecek apakah tebakan pengguna persis dengan jawaban
+            if (tebakanUser === jawabanBenar) {
+                let player = getPlayer(standardSenderId);
+                let hadiah = activeTebakGambar[chat.id._serialized].poin;
+                player.points += hadiah;
+
+                msg.reply(`🎉 *TEBAKAN BENAR!* 🎉\n\nSelamat *@${senderContact.id.user}*, jawabannya memang *${jawabanBenar.toUpperCase()}*!\nKamu berhasil mendapatkan *+${hadiah} Poin*.\n💰 Saldo kamu sekarang: *${player.points}*`, { mentions: [standardSenderId] });
+                
+                // Hapus sesi game karena sudah tertebak
+                delete activeTebakGambar[chat.id._serialized];
                 return; 
             }
         }
@@ -1837,6 +1859,60 @@ Teks yang harus diterjemahkan:
                     delete activeKuis[chat.id._serialized]; // Hapus kuis dari memori
                 }
             }, 60000);
+        }
+
+        // ==========================================
+        // 🖼️ GAME TEBAK GAMBAR
+        // ==========================================
+        else if (command === '!tebakgambar' || command === '!tg') {
+            if (!chat.isGroup) return msg.reply('❌ Game ini hanya bisa dimainkan di dalam grup!');
+            
+            // Cek apakah masih ada soal tebak gambar yang belum terjawab
+            if (activeTebakGambar[chat.id._serialized]) {
+                return msg.reply('⚠️ Masih ada soal tebak gambar yang belum terjawab di grup ini! Jawab dulu atau tunggu waktunya habis.');
+            }
+
+            msg.reply('⏳ Sedang menyiapkan gambar, mohon tunggu...');
+
+            try {
+                // Mengambil database tebak gambar dari repository publik
+                const response = await fetch('https://raw.githubusercontent.com/BochilGaming/games-wabot/master/data/tebakgambar.json');
+                const data = await response.json();
+                
+                // Memilih satu soal secara acak
+                const randomSoal = data[Math.floor(Math.random() * data.length)];
+
+                // Menyimpan jawaban ke dalam memori grup
+                activeTebakGambar[chat.id._serialized] = {
+                    jawaban: randomSoal.jawaban.toLowerCase(),
+                    poin: 20 // Hadiah poin untuk game ini
+                };
+
+                // Mendownload gambar dari URL yang didapat dari database
+                const mediaImage = await MessageMedia.fromUrl(randomSoal.img, { unsafeMime: true });
+
+                let pesanTg = `🖼️ *GAME TEBAK GAMBAR* 🖼️\n\n`;
+                pesanTg += `Petunjuk: *${randomSoal.deskripsi}*\n\n`;
+                pesanTg += `_Ketik langsung jawabannya di grup ini!_\n`;
+                pesanTg += `💰 _Hadiah: 20 Poin_ | ⏳ _Waktu: 60 Detik_`;
+
+                // Kirim gambar beserta pesannya
+                await chat.sendMessage(pesanTg, { media: mediaImage });
+
+                // Membuat timer 60 detik (60000 ms)
+                setTimeout(() => {
+                    // Mengecek apakah setelah 60 detik kuisnya masih ada (belum terjawab)
+                    if (activeTebakGambar[chat.id._serialized] && activeTebakGambar[chat.id._serialized].jawaban === randomSoal.jawaban.toLowerCase()) {
+                        client.sendMessage(chat.id._serialized, `⏰ *WAKTU HABIS!*\n\nTidak ada yang berhasil menebak.\nJawabannya adalah: *${randomSoal.jawaban.toUpperCase()}*`);
+                        delete activeTebakGambar[chat.id._serialized]; // Hapus kuis dari memori
+                    }
+                }, 60000);
+
+            } catch (error) {
+                console.log("Error Tebak Gambar:", error);
+                msg.reply('❌ Gagal mengambil soal tebak gambar. Pastikan bot terkoneksi internet.');
+                delete activeTebakGambar[chat.id._serialized]; // Mencegah bug game nyangkut
+            }
         }
 
         // 3. Toko VIP: Beli Status Kebal (1000 Poin untuk 24 Jam)
