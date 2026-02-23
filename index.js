@@ -879,6 +879,47 @@ _Bot siap melayani grup ini!_`);
             }
         }
 
+        else if (command === '!cek') {
+            // Validasi: Hanya Sudo / Owner yang bisa menggunakan perintah ini
+            if (!isSudo) {
+                return msg.reply('❌ Maaf, perintah ini HANYA bisa digunakan oleh Owner bot!');
+            }
+
+            // Daftar fitur utama dan perintah yang ada di bot Anda
+            // Anda bisa menambah/mengurangi daftar ini sesuai kebutuhan
+            const semuaFitur = [
+                'antilink', 'antikasar', 
+                '!ping', '!menu', '!admin', '!cuaca', '!quotes', '!menfess', 
+                '!cekkhodam', '!siapa', '!seberapa', '!setultah', '!ultah',
+                '!jomblo', '!gelar', '!kapsulwaktu', '!bukakapsul', 
+                '!patungan', '!kas', '!loker', '!addloker', '!delloker',
+                '!sholat', '!quran', '!hadits', 
+                '!sticker', '!steks', '!vn', '!tts', '!translate', '!dl',
+                '!zoom', '!meet', '!voting', '!reminder', '!simpan', '!catatan', 
+                '!bukaabsen', '!hadir', '!tutupabsen', 
+                '!kuis', '!saldo', '!tebak', '!belikebal', 
+                '!tagall', '!setgelar', '!kick', '!promote', '!demote', 
+                '!tutupgrup', '!bukagrup', '!blacklist', '!bukablacklist', '!hapus'
+            ];
+
+            let pesanStatus = "⚙️ *STATUS FITUR BOT SAAT INI* ⚙️\n\n";
+
+            // Melakukan pengecekan satu per satu
+            semuaFitur.forEach(f => {
+                // Jika fitur ada di dalam array disabledFeatures, berarti statusnya OFF
+                if (disabledFeatures.includes(f.toLowerCase())) {
+                    pesanStatus += `🔴 ${f}\n`;
+                } else {
+                    // Jika tidak ada, berarti statusnya ON
+                    pesanStatus += `🟢 ${f}\n`;
+                }
+            });
+
+            pesanStatus += `\n_Gunakan perintah *!fitur [nama] off/on* untuk mengubah status._`;
+            
+            msg.reply(pesanStatus);
+        }
+
         else if (command === '!menu' || command === '!help') {
             const menu = `*🤖 BUKU PANDUAN BOT GRUP 🤖*
 
