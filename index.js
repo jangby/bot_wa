@@ -1656,7 +1656,7 @@ Teks yang harus diterjemahkan:
 
 // Mengelompokkan perintah admin untuk dicek otoritasnya sekaligus
 // Mengelompokkan perintah admin untuk dicek otoritasnya sekaligus
-else if (['!tagall', '!kick', '!promote', '!demote', '!tutupgrup', '!bukagrup', '!blacklist', '!bukablacklist', '!on', '!off', '!zoom', '!meet', '!terlarang', '!listterlarang'].includes(command)) {
+else if (['!tagall', '!kick', '!promote', '!demote', '!tutupgrup', '!bukagrup', '!blacklist', '!bukablacklist', '!on', '!off', '!zoom', '!meet', '!terlarang', '!listterlarang', '!hapus'].includes(command)) {
 
     // 1. Pastikan perintah ini HANYA di grup
     if (!chat.isGroup) {
@@ -1719,6 +1719,31 @@ else if (['!tagall', '!kick', '!promote', '!demote', '!tutupgrup', '!bukagrup', 
             }
         } else {
             msg.reply('⚠️ Mohon tag orangnya. Contoh: *!kick @Budi*');
+        }
+    }
+
+    else if (command === '!hapus') {
+        // Pengecekan agar bot harus berstatus sebagai admin
+        if (!isBotAdmin) return msg.reply('❌ Bot harus dijadikan Admin terlebih dahulu agar bisa menghapus pesan orang lain.');
+        
+        // Pengecekan apakah perintah me-reply sebuah pesan
+        if (msg.hasQuotedMsg) {
+            try {
+                // Mengambil isi pesan yang di-reply
+                const quotedMsg = await msg.getQuotedMessage();
+                
+                // Menghapus pesan yang di-reply secara "Delete for everyone"
+                await quotedMsg.delete(true); 
+                
+                // (Opsional) Menghapus juga pesan yang berisi perintah "!hapus" milik admin tersebut
+                try { await msg.delete(true); } catch (e) {} 
+                
+            } catch (error) {
+                console.log("Error Hapus Pesan:", error);
+                msg.reply('❌ Gagal menghapus pesan. Pastikan pesan tersebut belum terlalu lama dikirim.');
+            }
+        } else {
+            msg.reply('⚠️ Cara pakai: *Reply (balas)* pesan anggota yang ingin dihapus, lalu ketik *!hapus*');
         }
     }
 
