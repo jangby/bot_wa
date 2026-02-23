@@ -50,6 +50,7 @@ let disabledFeatures = [];
 let ttsCooldowns = {};
 let ttsUsage = {}; // Mencatat histori penggunaan tts 1 menit terakhir
 let premiumTTS = {}; // Mencatat siapa saja yang sedang premium dan masa aktifnya
+let premiumTTSPribadi = {};
 let pendingPremium = {}; // Mencatat transaksi yang sedang menunggu verifikasi Owner
 let ultahData = {};
 let kasData = {};
@@ -290,9 +291,10 @@ client.on('message_create', async (msg) => {
 
     // Deteksi apakah ini pesan menfess dari chat pribadi
     const isMenfess = isPrivateChat && msg.body.toLowerCase().startsWith('!menfess');
+    const isTtsJapri = isPrivateChat && (msg.body.toLowerCase().startsWith('!ttspribadi') || msg.body.toLowerCase().startsWith('!tts'));
 
-    // Bot merespons jika: di grup, di japri oleh Owner, ATAU ada yang mengirim !menfess di japri
-    if (chat.isGroup || (isPrivateChat && isSudo) || isMenfess) {
+    // Bot merespons jika: di grup, di japri oleh Owner, ada !menfess, ATAU ada TTS di japri
+    if (chat.isGroup || (isPrivateChat && isSudo) || isMenfess || isTtsJapri) {
 
         // ==========================================
         // 🛡️ AUTO-MODERATOR (ANTI-LINK & FILTER KATA KASAR)
@@ -374,35 +376,37 @@ client.on('message_create', async (msg) => {
         // ==========================================
         // 💎 SISTEM VERIFIKASI PREMIUM OLEH OWNER
         // ==========================================
-        // Jika ini di chat pribadi, pengirimnya Owner, dan dia me-reply pesan
         if (isPrivateChat && isSudo && msg.hasQuotedMsg) {
             const quotedMsg = await msg.getQuotedMessage();
             
-            // Cek apakah pesan yang di-reply adalah tiket verifikasi dari bot
             if (quotedMsg.fromMe && pendingPremium[quotedMsg.id._serialized]) {
                 const data = pendingPremium[quotedMsg.id._serialized];
                 const replyText = msg.body.trim().toUpperCase();
                 
                 if (replyText === 'YA') {
-                    // Beri akses Premium selama 1 Jam (60 menit x 60 detik x 1000 milidetik)
-                    premiumTTS[data.userId] = Date.now() + (60 * 60 * 1000); 
-                    
-                    // Kirim notifikasi ke grup
-                    await client.sendMessage(data.groupId, `🎉 *PEMBAYARAN BERHASIL!* 🎉\n\nSelamat! Pembayaran *Premium TTS* telah diverifikasi oleh Owner.\n@${data.userId.split('@')[0]} sekarang memiliki akses fitur *!tts TANPA BATAS* selama 1 Jam ke depan! 🔥`, { mentions: [data.userId] });
-                    
-                    // Balas ke Owner
-                    msg.reply('✅ Berhasil verifikasi. User telah diupgrade ke Premium TTS selama 1 Jam.');
-                    delete pendingPremium[quotedMsg.id._serialized]; // Hapus tiket
-                    return; // Stop proses agar tidak lanjut ke bawah
+                    if (data.tipe === 'pribadi') {
+                        // Akses TTS Pribadi
+                        premiumTTSPribadi[data.userId] = Date.now() + (60 * 60 * 1000); 
+                        await client.sendMessage(data.chatId, `🎉 *PEMBAYARAN BERHASIL!* 🎉\n\nSelamat! Pembayaran *TTS Pribadi* telah diverifikasi.\nKamu sekarang memiliki akses fitur *!tts TANPA BATAS* di chat japri ini selama 1 Jam ke depan! 🔥`);
+                        msg.reply('✅ Berhasil verifikasi. User telah diupgrade ke TTS Pribadi (1 Jam).');
+                    } else {
+                        // Akses TTS Grup
+                        premiumTTS[data.userId] = Date.now() + (60 * 60 * 1000); 
+                        await client.sendMessage(data.chatId, `🎉 *PEMBAYARAN BERHASIL!* 🎉\n\nSelamat! Pembayaran *Premium TTS* telah diverifikasi oleh Owner.\n@${data.userId.split('@')[0]} sekarang memiliki akses fitur *!tts TANPA BATAS* di grup ini selama 1 Jam ke depan! 🔥`, { mentions: [data.userId] });
+                        msg.reply('✅ Berhasil verifikasi. User telah diupgrade ke Premium TTS Grup (1 Jam).');
+                    }
+                    delete pendingPremium[quotedMsg.id._serialized];
+                    return; 
                 } 
                 else if (replyText === 'TIDAK') {
-                    // Kirim notifikasi penolakan ke grup
-                    await client.sendMessage(data.groupId, `❌ Mohon maaf @${data.userId.split('@')[0]}, pembayaran *Premium TTS* kamu DITOLAK oleh Owner. Pastikan bukti transfer valid!`, { mentions: [data.userId] });
-                    
-                    // Balas ke Owner
-                    msg.reply('❌ Pembayaran ditolak. Notifikasi telah dikirim ke grup.');
-                    delete pendingPremium[quotedMsg.id._serialized]; // Hapus tiket
-                    return; // Stop proses
+                    if (data.tipe === 'pribadi') {
+                        await client.sendMessage(data.chatId, `❌ Mohon maaf, pembayaran *TTS Pribadi* kamu DITOLAK oleh Owner. Pastikan bukti transfer valid dan format nomor HP benar!`);
+                    } else {
+                        await client.sendMessage(data.chatId, `❌ Mohon maaf @${data.userId.split('@')[0]}, pembayaran *Premium TTS Grup* kamu DITOLAK oleh Owner.`, { mentions: [data.userId] });
+                    }
+                    msg.reply('❌ Pembayaran ditolak. Notifikasi telah dikirim.');
+                    delete pendingPremium[quotedMsg.id._serialized];
+                    return; 
                 }
             }
         }
@@ -1419,97 +1423,109 @@ _Bot siap melayani grup ini!_`);
         // ==========================================
         else if (command === '!tts') {
             const teksTts = args.join(' ');
-            if (!teksTts) return msg.reply('❌ Masukkan teksnya!\nContoh: *!tts Pengumuman untuk semua santri di asrama*');
+            if (!teksTts) return msg.reply('❌ Masukkan teksnya!\nContoh: *!tts Pengumuman untuk semua*');
 
-            // Cek apakah user adalah Premium atau Owner
-            const isPremium = premiumTTS[standardSenderId] && premiumTTS[standardSenderId] > Date.now();
-            
-            // Jika bukan Owner dan Bukan Premium, terapkan limit 3x per menit
-            if (!isSudo && !isPremium) {
-                const waktuSekarang = Date.now();
-                if (!ttsUsage[standardSenderId]) ttsUsage[standardSenderId] = [];
+            if (isPrivateChat) {
+                // LOGIKA UNTUK TTS JAPRI PRIBADI
+                const isPremiumPribadi = premiumTTSPribadi[standardSenderId] && premiumTTSPribadi[standardSenderId] > Date.now();
                 
-                // Hapus histori yang sudah lewat dari 1 menit (60.000 ms)
-                ttsUsage[standardSenderId] = ttsUsage[standardSenderId].filter(waktu => waktuSekarang - waktu < 60000);
-
-                // Jika pemakaian sudah mencapai 3 kali dalam 1 menit terakhir
-                if (ttsUsage[standardSenderId].length >= 3) {
-                    return msg.reply('⏳ *LIMIT HABIS!* Kamu sudah menggunakan !tts 3 kali dalam 1 menit.\n\n💎 *UPGRADE PREMIUM TTS*\nDapatkan akses !tts *TANPA BATAS* selama 1 Jam hanya dengan *Rp 5.000*!\n\nKetik perintah *!ttspremium* untuk melihat QR Code pembayaran.');
+                if (!isSudo && !isPremiumPribadi) {
+                    return msg.reply('❌ Kamu belum memiliki akses *TTS Pribadi*.\n\n💎 *UPGRADE TTS PRIBADI*\nDapatkan akses !tts di chat japri *TANPA BATAS* selama 1 Jam seharga *Rp 10.000*.\n\nKetik *!ttspribadi* untuk melihat QR Code pembayaran.');
                 }
+            } else {
+                // LOGIKA UNTUK TTS GRUP
+                const isPremium = premiumTTS[standardSenderId] && premiumTTS[standardSenderId] > Date.now();
+                
+                if (!isSudo && !isPremium) {
+                    const waktuSekarang = Date.now();
+                    if (!ttsUsage[standardSenderId]) ttsUsage[standardSenderId] = [];
+                    
+                    ttsUsage[standardSenderId] = ttsUsage[standardSenderId].filter(waktu => waktuSekarang - waktu < 300000);
 
-                // Catat waktu pemakaian saat ini
-                ttsUsage[standardSenderId].push(waktuSekarang);
+                    if (ttsUsage[standardSenderId].length >= 3) {
+                        return msg.reply('⏳ *LIMIT HABIS!*\n\nKamu sudah pakai *!tts* 3 kali dlm 5 menit. Tunggu sebentar lagi, atau upgrade:\n\n💎 *PREMIUM TTS GRUP*\nAkses !tts *TANPA BATAS* selama 1 Jam hanya *Rp 5.000*!\nKetik *!ttspremium* untuk melihat QR Code.');
+                    }
+                    ttsUsage[standardSenderId].push(waktuSekarang);
+                }
             }
 
+            // PROSES PEMBUATAN AUDIO (Tidak Berubah)
             try {
                 msg.reply('⏳ Sedang memproses suara...');
-                
-                const urlAudio = googleTTS.getAudioUrl(teksTts, {
-                    lang: 'id',
-                    slow: false,
-                    host: 'https://translate.google.com',
-                });
-
+                const urlAudio = googleTTS.getAudioUrl(teksTts, { lang: 'id', slow: false, host: 'https://translate.google.com' });
                 const mediaAudio = await MessageMedia.fromUrl(urlAudio, { unsafeMime: true });
                 await client.sendMessage(msg.from, mediaAudio, { sendAudioAsVoice: true });
             } catch (error) {
-                console.log("Error TTS:", error);
                 msg.reply('❌ Gagal membuat suara. Teks mungkin terlalu panjang.');
             }
         }
 
         // ==========================================
-        // 💎 PEMBELIAN PREMIUM TTS
+        // 💎 PEMBELIAN PREMIUM TTS GRUP (RP 5.000)
         // ==========================================
         else if (command === '!ttspremium') {
             if (!chat.isGroup) return msg.reply('❌ Fitur ini hanya bisa diakses di dalam Grup.');
 
-            // Jika dia melampirkan gambar (Bukti Transfer)
             if (msg.hasMedia) {
-                if (args.length === 0) return msg.reply('❌ Format salah!\nSertakan namamu di caption saat mengirim foto.\nContoh: *!ttspremium Budi*');
+                if (args.length === 0) return msg.reply('❌ Format salah!\nContoh: *!ttspremium Budi*');
                 
                 const namaPembeli = args.join(' ');
-                msg.reply('⏳ Bukti transfer sedang dikirim ke Owner untuk diverifikasi. Mohon tunggu...');
+                msg.reply('⏳ Bukti transfer dikirim ke Owner...');
 
                 try {
                     const media = await msg.downloadMedia();
-                    const ownerId = sudoUsers[0]; // Mengirim ke Owner pertama di daftar Sudo
+                    const ownerMsg = await client.sendMessage(sudoUsers[0], media, { caption: `💎 *PERMINTAAN PREMIUM GRUP*\n\nNama: ${namaPembeli}\nNomor: ${senderNumber}\nGrup: ${chat.name}\n\n_Balas dengan *YA* atau *TIDAK*_` });
                     
-                    const captionToOwner = `💎 *PERMINTAAN PREMIUM TTS* 💎\n\nNama: ${namaPembeli}\nNomor: ${senderNumber}\nGrup: ${chat.name}\n\n_Silakan *Reply (Balas)* pesan ini dengan ketik *YA* untuk menerima, atau *TIDAK* untuk menolak._`;
-                    
-                    // Mengirim foto bukti ke DM Owner
-                    const ownerMsg = await client.sendMessage(ownerId, media, { caption: captionToOwner });
-                    
-                    // Mencatat ID Pesan tersebut ke dalam tiket pending
                     pendingPremium[ownerMsg.id._serialized] = {
                         userId: standardSenderId,
-                        groupId: chat.id._serialized
+                        chatId: chat.id._serialized,
+                        tipe: 'grup'
                     };
-                } catch (err) {
-                    console.log("Error kirim bukti TF:", err);
-                    msg.reply('❌ Gagal mengirim bukti ke Owner. Coba lagi nanti.');
-                }
+                } catch (err) { msg.reply('❌ Gagal mengirim bukti ke Owner.'); }
 
             } else {
-                // Jika cuma ngetik perintah tanpa gambar (Menampilkan Info & QR)
                 try {
                     const { MessageMedia } = require('whatsapp-web.js');
-                    const mediaQr = MessageMedia.fromFilePath('./qr_dana.jpeg'); // Pastikan nama file ini benar!
-                    
-                    let penawaran = `💎 *PREMIUM TTS (1 JAM UNLIMITED)* 💎\n\n`;
-                    penawaran += `Harga: *Rp 5.000*\n\n`;
-                    penawaran += `*Cara Pembelian:*\n`;
-                    penawaran += `1. Scan QR Code DANA di atas dan transfer sebesar Rp 5.000.\n`;
-                    penawaran += `2. Screenshot (SS) bukti transfer tersebut.\n`;
-                    penawaran += `3. Kirim SS bukti tersebut ke grup ini dengan caption:\n*!ttspremium [Nama Kamu]*\n`;
-                    penawaran += `_(Contoh: !ttspremium Budi)_\n\n`;
-                    penawaran += `_Owner akan langsung memverifikasi dan akses !tts kamu akan terbuka tanpa limit!_`;
+                    const mediaQr = MessageMedia.fromFilePath('./qr_dana.jpeg');
+                    await chat.sendMessage(`💎 *PREMIUM TTS GRUP (1 JAM)* 💎\n\nHarga: *Rp 5.000*\n\nKirim SS bukti TF ke grup ini dgn caption:\n*!ttspremium [Nama Kamu]*\n_Contoh: !ttspremium Budi_`, { media: mediaQr });
+                } catch (err) { msg.reply('❌ Gambar QR belum disiapkan Owner.'); }
+            }
+        }
 
-                    await chat.sendMessage(penawaran, { media: mediaQr });
-                } catch (err) {
-                    console.log("Error baca file QR:", err);
-                    msg.reply('❌ Gambar QR Code belum disiapkan oleh Owner. Hubungi Owner untuk minta nomor DANA manual.');
-                }
+        // ==========================================
+        // 💎 PEMBELIAN TTS PRIBADI JAPRI (RP 10.000)
+        // ==========================================
+        else if (command === '!ttspribadi') {
+            if (chat.isGroup) return msg.reply('❌ Perintah ini khusus untuk di chat pribadi (Japri) ke bot.');
+
+            if (msg.hasMedia) {
+                if (args.length < 2) return msg.reply('❌ Format salah!\nSertakan namamu dan no HP (awalan 62) di caption.\nContoh: *!ttspribadi Budi 628123456789*');
+                
+                const nohp = args.pop(); // Mengambil kata terakhir sebagai nomor HP
+                const namaPembeli = args.join(' ');
+
+                // Validasi harus angka 62
+                if (!nohp.startsWith('62')) return msg.reply('❌ Nomor HP harus diawali dengan angka 62!\nContoh yang benar: *628123456789*');
+
+                msg.reply('⏳ Bukti transfer dikirim ke Owner...');
+
+                try {
+                    const media = await msg.downloadMedia();
+                    const ownerMsg = await client.sendMessage(sudoUsers[0], media, { caption: `💎 *PERMINTAAN TTS PRIBADI (JAPRI)*\n\nNama: ${namaPembeli}\nNo HP: ${nohp}\nID Chat: ${standardSenderId}\n\n_Balas dengan *YA* atau *TIDAK*_` });
+                    
+                    pendingPremium[ownerMsg.id._serialized] = {
+                        userId: standardSenderId,
+                        chatId: chat.id._serialized,
+                        tipe: 'pribadi'
+                    };
+                } catch (err) { msg.reply('❌ Gagal mengirim bukti ke Owner.'); }
+
+            } else {
+                try {
+                    const { MessageMedia } = require('whatsapp-web.js');
+                    const mediaQr = MessageMedia.fromFilePath('./qr_dana.jpeg');
+                    await chat.sendMessage(`💎 *TTS PRIBADI JAPRI (1 JAM)* 💎\n\nHarga: *Rp 10.000*\n\n*Cara Beli:*\n1. Scan QR DANA & Transfer Rp 10.000\n2. Kirim Screenshot ke obrolan ini dgn caption:\n*!ttspribadi [Nama] [No HP 62...]*\n\n_(Contoh: !ttspribadi Budi 628123456789)_`, { media: mediaQr });
+                } catch (err) { msg.reply('❌ Gambar QR belum disiapkan Owner.'); }
             }
         }
 
