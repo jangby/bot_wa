@@ -215,17 +215,16 @@ client.on('message', async (msg) => {
     // 1. SISTEM ID ANTI-ERROR (MULTI-DEVICE) - REVISI FINAL
     // ==========================================
     // Menggunakan getContact() agar PASTI mendapatkan ID pengguna (bukan ID grup)
-    const senderContact = await msg.getContact();
-    let standardSenderId = senderContact.id._serialized; 
+    let standardSenderId = msg.author || msg.from; 
     
-    // Membersihkan ID dari kode perangkat (misal :1, :2) agar WA Web/HP sama saja
+    // Membersihkan ID dari kode perangkat (misal :1, :2)
     if (standardSenderId && standardSenderId.includes(':')) {
         standardSenderId = standardSenderId.split(':')[0] + '@c.us';
     }
 
     const senderNumber = standardSenderId.split('@')[0]; 
-
     const isPrivateChat = !chat.isGroup;
+    const senderContact = await msg.getContact();
     
     // Pengecekan Owner HARUS di sini (setelah ID-nya bersih dan akurat)
     const isSudo = sudoUsers.includes(standardSenderId);
@@ -241,11 +240,12 @@ client.on('message', async (msg) => {
         let isSenderAdmin = false;
 
         if (chat.isGroup) {
-            // Pengecekan Bot Admin menggunakan id.user (Mengambil angka WA-nya saja)
-            const bot = participants.find(p => p.id.user === client.info.wid.user);
+            // PERBAIKAN: Bersihkan ID bot dari kode device (:1) agar match dengan daftar anggota
+            const botNumber = client.info.wid.user.split(':')[0];
+            const bot = participants.find(p => p.id.user === botNumber);
             isBotAdmin = bot?.isAdmin || bot?.isSuperAdmin;
 
-            // Pengecekan Pengirim Admin menggunakan id.user
+            // Pengecekan Pengirim Admin
             const sender = participants.find(p => p.id.user === senderNumber);
             isSenderAdmin = sender?.isAdmin || sender?.isSuperAdmin;
         }
@@ -298,15 +298,16 @@ client.on('message', async (msg) => {
         // 🛑 SISTEM EKSEKUSI BLACKLIST 
         // ==========================================
         if (blacklistedUsers.includes(standardSenderId)) {
-            // Sekarang bot sudah tahu apakah dia isBotAdmin atau bukan!
             if (isBotAdmin) {
                 try {
                     await msg.delete(true); 
                 } catch (error) {
-                    console.log("Gagal menghapus pesan blacklist:", error);
+                    console.log(`[BLACKLIST ERROR] Gagal hapus pesan dari ${senderNumber}. Pastikan target bukan sesama Admin atau Superadmin!`);
                 }
+            } else {
+                console.log(`[BLACKLIST ERROR] Bot saat ini BUKAN Admin, jadi tidak bisa hapus pesan!`);
             }
-            return; 
+            return; // Harus tetap return agar bot tidak memproses perintah lain dari orang ini
         }
         // ==========================================
 
