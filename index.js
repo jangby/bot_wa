@@ -225,6 +225,10 @@ client.on('message_create', async (msg) => {
     const isPrivateChat = !chat.isGroup;
     const senderContact = await msg.getContact();
 
+    // 👇👇👇 TAMBAHKAN BARIS INI (SANGAT PENTING!) 👇👇👇
+    const participants = chat.isGroup ? chat.participants : [];
+    // 👆👆👆 ========================================= 👆👆👆
+
     // ==========================================
     // 2. PENGECEKAN OTORITAS (OWNER & ADMIN)
     // ==========================================
@@ -234,15 +238,16 @@ client.on('message_create', async (msg) => {
     let isSenderAdmin = false;
 
     if (chat.isGroup) {
-            // PERBAIKAN: Bersihkan ID bot dari kode device (:1) agar match dengan daftar anggota
-            const botNumber = client.info.wid.user.split(':')[0];
-            const bot = participants.find(p => p.id.user === botNumber);
-            isBotAdmin = bot?.isAdmin || bot?.isSuperAdmin;
+        // PERBAIKAN: Gunakan _serialized agar sistem anti-bug dan tidak error
+        let botId = client.info.wid._serialized;
+        if (botId.includes(':')) botId = botId.split(':')[0] + '@c.us';
+        const bot = participants.find(p => p.id._serialized === botId);
+        isBotAdmin = bot?.isAdmin || bot?.isSuperAdmin;
 
-            // Pengecekan Pengirim Admin
-            const sender = participants.find(p => p.id.user === senderNumber);
-            isSenderAdmin = sender?.isAdmin || sender?.isSuperAdmin;
-        }
+        // Pengecekan Pengirim Admin
+        const sender = participants.find(p => p.id._serialized === standardSenderId);
+        isSenderAdmin = sender?.isAdmin || sender?.isSuperAdmin;
+    }
 
     // [OPSIONAL] Log debugging buat kamu di terminal biar tau kalau ada yang error
     if (msg.body.startsWith('!blacklist')) {
