@@ -15,6 +15,29 @@ const startTime = new Date(); // Mencatat waktu bot pertama kali dijalankan
 const { exec } = require('child_process');
 const fs = require('fs');
 let activeSambungKata = {};
+// Variabel untuk menyimpan puluhan ribu kata di RAM (sangat ringan karena menggunakan Set)
+let kamusIndonesia = new Set();
+
+// Fungsi untuk mendownload kamus saat bot pertama kali dijalankan
+async function loadKamus() {
+    try {
+        console.log('⏳ Sedang memuat kamus bahasa Indonesia...');
+        // Mengambil file txt berisi sekitar 30.000 kata dasar dari repository Sastrawi
+        const response = await fetch('https://raw.githubusercontent.com/sastrawi/sastrawi/master/data/kata-dasar.txt');
+        const text = await response.text();
+        
+        // Memecah teks per baris dan memasukkannya ke dalam Set agar pencariannya kilat (O(1))
+        const words = text.split('\n').map(w => w.trim().toLowerCase());
+        kamusIndonesia = new Set(words);
+        
+        console.log(`✅ Kamus berhasil dimuat! Total kata yang dihafal bot: ${kamusIndonesia.size}`);
+    } catch (err) {
+        console.log('❌ Gagal memuat kamus:', err);
+    }
+}
+
+// Eksekusi fungsinya
+loadKamus();
 const kataAwalSambungKata = ["makan", "minum", "tidur", "kucing", "sepatu", "botol", "gelas", "buku", "pensil", "kertas"];
 const sudoUsers = [
     '6285136468097@c.us',
@@ -465,6 +488,14 @@ client.on('message_create', async (msg) => {
                         msg.reply('⚠️ Curang! Kata minimal harus 3 huruf.');
                         return;
                     }
+
+                    // --- ATURAN BARU (ANTI-NGASAL) ---
+                    // Mengecek apakah kata tersebut ada di dalam database bahasa Indonesia
+                    if (!kamusIndonesia.has(jawaban)) {
+                        msg.reply(`❌ Curang! *${jawaban.toUpperCase()}* itu bukan kata bahasa Indonesia yang valid!`);
+                        return;
+                    }
+                    // ---------------------------------
 
                     // Aturan 4: Kata belum pernah dipakai di sesi ini
                     if (game.usedWords.includes(jawaban)) {
