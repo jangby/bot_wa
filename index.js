@@ -905,7 +905,7 @@ _Bot siap melayani grup ini!_`);
             // Daftar fitur utama dan perintah yang ada di bot Anda
             // Anda bisa menambah/mengurangi daftar ini sesuai kebutuhan
             const semuaFitur = [
-                'antilink', 'antikasar', 
+                'antilink', 'antikasar', 'antivirtex',
                 '!ping', '!menu', '!admin', '!cuaca', '!quotes', '!menfess', 
                 '!cekkhodam', '!siapa', '!seberapa', '!setultah', '!ultah',
                 '!jomblo', '!gelar', '!kapsulwaktu', '!bukakapsul', 
@@ -916,7 +916,8 @@ _Bot siap melayani grup ini!_`);
                 '!bukaabsen', '!hadir', '!tutupabsen', 
                 '!kuis', '!saldo', '!tebak', '!belikebal', 
                 '!tagall', '!setgelar', '!kick', '!promote', '!demote', 
-                '!tutupgrup', '!bukagrup', '!blacklist', '!bukablacklist', '!hapus'
+                '!tutupgrup', '!bukagrup', '!blacklist', '!bukablacklist', '!hapus',
+                '!warn', '!lirik'
             ];
 
             let pesanStatus = "⚙️ *STATUS FITUR BOT SAAT INI* ⚙️\n\n";
@@ -1618,24 +1619,25 @@ Teks yang harus diterjemahkan:
         // 🎵 FITUR PENCARI LIRIK LAGU (!lirik)
         // ==========================================
         else if (command === '!lirik') {
-            if (args.length === 0) return msg.reply('❌ Masukkan judul lagunya!\nContoh: *!lirik Sempurna Andra and the Backbone*');
+            if (args.length === 0) return msg.reply('❌ Masukkan judul lagunya!\nContoh: *!lirik Sempurna Andra*');
             
             const judulLagu = args.join(' ');
             msg.reply(`⏳ Sedang mencari lirik lagu *${judulLagu}*...`);
 
             try {
-                // Menggunakan API gratis dari popcat
-                const response = await fetch(`https://api.popcat.xyz/lyrics?song=${encodeURIComponent(judulLagu)}`);
+                // Menggunakan API alternatif yang lebih pintar mencari lagu Indo
+                const response = await fetch(`https://some-random-api.com/lyrics?title=${encodeURIComponent(judulLagu)}`);
                 const data = await response.json();
 
                 if (data.lyrics) {
                     let pesanLirik = `🎵 *${data.title}* 🎵\n`;
-                    pesanLirik += `🎤 Artist: *${data.artist}*\n\n`;
+                    // Di API ini, nama penyanyi menggunakan variabel "author"
+                    pesanLirik += `🎤 Artist: *${data.author}*\n\n`; 
                     pesanLirik += `${data.lyrics}`;
                     
                     msg.reply(pesanLirik);
                 } else {
-                    msg.reply(`❌ Lirik lagu *${judulLagu}* tidak ditemukan di database.`);
+                    msg.reply(`❌ Lirik lagu *${judulLagu}* tidak ditemukan. Coba ketik judul lagunya lebih lengkap!`);
                 }
             } catch (error) {
                 console.log("Error Lirik:", error);
