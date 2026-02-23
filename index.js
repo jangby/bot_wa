@@ -208,47 +208,65 @@ client.on('ready', () => {
     console.log('✅ Bot berhasil terhubung dan siap menerima semua perintah!');
 });
 
-client.on('message', async (msg) => {
+client.on('message_create', async (msg) => {
     const chat = await msg.getChat();
 
     // ==========================================
-    // 1. SISTEM ID ANTI-ERROR (MULTI-DEVICE) - REVISI FINAL
+    // 1. SISTEM ID PENGIRIM (BULLETPROOF)
     // ==========================================
-    // Menggunakan getContact() agar PASTI mendapatkan ID pengguna (bukan ID grup)
-    let standardSenderId = msg.author || msg.from; 
-    
-    // Membersihkan ID dari kode perangkat (misal :1, :2)
+    let standardSenderId;
+
+    // Jika pesan dikirim oleh nomor bot itu sendiri
+    if (msg.fromMe) {
+        standardSenderId = client.info.wid._serialized;
+    } else {
+        // msg.author untuk chat grup, msg.from untuk chat pribadi
+        standardSenderId = msg.author || msg.from; 
+    }
+
+    // Bersihkan ID dari kode device (wajib!)
     if (standardSenderId && standardSenderId.includes(':')) {
         standardSenderId = standardSenderId.split(':')[0] + '@c.us';
     }
 
     const senderNumber = standardSenderId.split('@')[0]; 
     const isPrivateChat = !chat.isGroup;
+
+    // Tarik kontak pengirim (dipindah ke sini agar tidak error)
     const senderContact = await msg.getContact();
-    
-    // Pengecekan Owner HARUS di sini (setelah ID-nya bersih dan akurat)
+
+    // ==========================================
+    // 2. PENGECEKAN OTORITAS (OWNER & ADMIN)
+    // ==========================================
     const isSudo = sudoUsers.includes(standardSenderId);
+
+    let isBotAdmin = false;
+    let isSenderAdmin = false;
+
+    if (chat.isGroup) {
+        const participants = chat.participants;
+        
+        // Cek Otoritas Bot (Gunakan _serialized agar lebih konsisten)
+        let botId = client.info.wid._serialized;
+        if (botId.includes(':')) botId = botId.split(':')[0] + '@c.us';
+        const bot = participants.find(p => p.id._serialized === botId);
+        isBotAdmin = bot?.isAdmin || bot?.isSuperAdmin;
+
+        // Cek Otoritas Pengirim
+        const sender = participants.find(p => p.id._serialized === standardSenderId);
+        isSenderAdmin = sender?.isAdmin || sender?.isSuperAdmin;
+    }
+
+    // [OPSIONAL] Log debugging buat kamu di terminal biar tau kalau ada yang error
+    if (msg.body.startsWith('!blacklist')) {
+        console.log(`[DEBUG OTORITAS] ID: ${standardSenderId} | Sudo: ${isSudo} | Admin: ${isSenderAdmin}`);
+    }
 
     // Deteksi apakah ini pesan menfess dari chat pribadi
     const isMenfess = isPrivateChat && msg.body.toLowerCase().startsWith('!menfess');
 
     // Bot merespons jika: di grup, di japri oleh Owner, ATAU ada yang mengirim !menfess di japri
     if (chat.isGroup || (isPrivateChat && isSudo) || isMenfess) {
-        const participants = chat.isGroup ? chat.participants : [];
-        
-        let isBotAdmin = false;
-        let isSenderAdmin = false;
-
-        if (chat.isGroup) {
-            // PERBAIKAN: Bersihkan ID bot dari kode device (:1) agar match dengan daftar anggota
-            const botNumber = client.info.wid.user.split(':')[0];
-            const bot = participants.find(p => p.id.user === botNumber);
-            isBotAdmin = bot?.isAdmin || bot?.isSuperAdmin;
-
-            // Pengecekan Pengirim Admin
-            const sender = participants.find(p => p.id.user === senderNumber);
-            isSenderAdmin = sender?.isAdmin || sender?.isSuperAdmin;
-        }
 
         // ==========================================
         // 🛡️ AUTO-MODERATOR (ANTI-LINK & FILTER KATA KASAR)
