@@ -1443,7 +1443,12 @@ _Bot siap melayani grup ini!_`);
                     ttsUsage[standardSenderId] = ttsUsage[standardSenderId].filter(waktu => waktuSekarang - waktu < 300000);
 
                     if (ttsUsage[standardSenderId].length >= 3) {
-                        return msg.reply('⏳ *LIMIT HABIS!*\n\nKamu sudah pakai *!tts* 3 kali dlm 5 menit. Tunggu sebentar lagi, atau upgrade:\n\n💎 *PREMIUM TTS GRUP*\nAkses !tts *TANPA BATAS* selama 1 Jam hanya *Rp 5.000*!\nKetik *!ttspremium* untuk melihat QR Code.');
+                        // PROMOSI DISALIPKAN DI SINI SAAT LIMIT GRUP HABIS
+                        let pesanLimit = `⏳ *LIMIT HABIS!*\n\nKamu sudah pakai *!tts* 3 kali dlm 5 menit. Tunggu sebentar lagi, atau upgrade:\n\n`;
+                        pesanLimit += `💎 *PREMIUM TTS GRUP (Rp 5.000)*\nAkses !tts TANPA BATAS di grup ini selama 1 Jam. Ketik *!ttspremium*.\n\n`;
+                        pesanLimit += `✨ *MAU LEBIH PRIVASI? (BARU)*\nAda juga *TTS PRIBADI (Rp 10.000)* buat dipakai bebas di chat Japri bot. Langsung chat pribadi ke bot dan ketik *!ttspribadi* !`;
+                        
+                        return msg.reply(pesanLimit);
                     }
                     ttsUsage[standardSenderId].push(waktuSekarang);
                 }
@@ -1487,7 +1492,14 @@ _Bot siap melayani grup ini!_`);
                 try {
                     const { MessageMedia } = require('whatsapp-web.js');
                     const mediaQr = MessageMedia.fromFilePath('./qr_dana.jpeg');
-                    await chat.sendMessage(`💎 *PREMIUM TTS GRUP (1 JAM)* 💎\n\nHarga: *Rp 5.000*\n\nKirim SS bukti TF ke grup ini dgn caption:\n*!ttspremium [Nama Kamu]*\n_Contoh: !ttspremium Budi_`, { media: mediaQr });
+                    
+                    // PROMOSI TTS PRIBADI DISALIPKAN DI SINI (INFO TAMBAHAN)
+                    let pesanPenawaran = `💎 *PREMIUM TTS GRUP (1 JAM)* 💎\n\n`;
+                    pesanPenawaran += `Harga: *Rp 5.000*\n\n`;
+                    pesanPenawaran += `Kirim SS bukti TF ke grup ini dgn caption:\n*!ttspremium [Nama Kamu]*\n_Contoh: !ttspremium Budi_\n\n`;
+                    pesanPenawaran += `✨ *INFO TAMBAHAN*\n_Ingin pakai bot buat TTS di luar grup (Japri)? Hubungi bot lewat chat pribadi lalu ketik *!ttspribadi* (Harga Rp 10.000)._`;
+                    
+                    await chat.sendMessage(pesanPenawaran, { media: mediaQr });
                 } catch (err) { msg.reply('❌ Gambar QR belum disiapkan Owner.'); }
             }
         }
