@@ -16,6 +16,7 @@ const { exec } = require('child_process');
 const fs = require('fs');
 let activeTebakGambar = {};
 let activeSambungKata = {};
+let activeTTT = {};
 // Variabel untuk menyimpan puluhan ribu kata di RAM (sangat ringan karena menggunakan Set)
 let kamusIndonesia = new Set();
 
@@ -473,6 +474,72 @@ client.on('message_create', async (msg) => {
         }
 
         // ==========================================
+        // ⭕ SISTEM PENGECEK GAME TIC-TAC-TOE ❌
+        // ==========================================
+        if (activeTTT[chat.id._serialized] && !msg.fromMe && !msg.body.startsWith('!')) {
+            let game = activeTTT[chat.id._serialized];
+            
+            // Cek apakah yang nge-chat adalah pemain yang sedang dapat giliran
+            if ((game.turn === 'X' && game.playerX === standardSenderId) || (game.turn === 'O' && game.playerO === standardSenderId)) {
+                let angka = parseInt(msg.body.trim());
+                
+                // Jika dia ngetik angka 1-9
+                if (angka >= 1 && angka <= 9) {
+                    let index = angka - 1;
+                    
+                    // Cek apakah kotak tersebut masih kosong (isinya masih angka 1-9)
+                    if (['1','2','3','4','5','6','7','8','9'].includes(game.board[index])) {
+                        game.board[index] = game.turn; // Isi dengan X atau O
+                        game.moves++;
+                        
+                        // Cek kondisi menang (Horizontal, Vertikal, Diagonal)
+                        const polaMenang = [
+                            [0,1,2], [3,4,5], [6,7,8], // Horizontal
+                            [0,3,6], [1,4,7], [2,5,8], // Vertikal
+                            [0,4,8], [2,4,6]           // Diagonal
+                        ];
+                        
+                        let isMenang = false;
+                        for (let p of polaMenang) {
+                            if (game.board[p[0]] === game.board[p[1]] && game.board[p[1]] === game.board[p[2]]) {
+                                isMenang = true; break;
+                            }
+                        }
+                        
+                        // Fungsi kecil untuk menggambar papan game
+                        const gambarPapan = (b) => {
+                            let papanStr = ` ${b[0]} | ${b[1]} | ${b[2]} \n---+---+---\n ${b[3]} | ${b[4]} | ${b[5]} \n---+---+---\n ${b[6]} | ${b[7]} | ${b[8]} `;
+                            return `\`\`\`${papanStr.replace(/X/g, '❌').replace(/O/g, '⭕')}\`\`\``;
+                        };
+
+                        if (isMenang) {
+                            let hadiah = 50;
+                            let playerObj = getPlayer(standardSenderId);
+                            playerObj.points += hadiah;
+                            
+                            chat.sendMessage(`🎉 *SKAKMAT!* 🎉\n\nSelamat *@${standardSenderId.split('@')[0]}* (${game.turn}) MENANG dan mendapatkan *+${hadiah} Poin*!\n\n${gambarPapan(game.board)}`, {mentions: [game.playerX, game.playerO]});
+                            delete activeTTT[chat.id._serialized];
+                            return;
+                        } else if (game.moves === 9) {
+                            chat.sendMessage(`🤝 *YAAH SERI!* 🤝\n\nKalian berdua sama-sama kuat. Tidak ada yang menang!\n\n${gambarPapan(game.board)}`, {mentions: [game.playerX, game.playerO]});
+                            delete activeTTT[chat.id._serialized];
+                            return;
+                        } else {
+                            // Ganti giliran ke pemain satunya
+                            game.turn = game.turn === 'X' ? 'O' : 'X';
+                            let nextPlayer = game.turn === 'X' ? game.playerX : game.playerO;
+                            chat.sendMessage(`Langkah diterima!\n\nSekarang giliran *@${nextPlayer.split('@')[0]}* (${game.turn})\n👉 *Ketik angka 1-9* yang tersisa untuk mengisi kotak:\n\n${gambarPapan(game.board)}`, {mentions: [nextPlayer]});
+                            return;
+                        }
+                    } else {
+                        msg.reply('⚠️ Kotak itu sudah terisi! Pilih angka lain yang masih kosong.');
+                        return;
+                    }
+                }
+            }
+        }
+
+        // ==========================================
         // 🖼️ SISTEM PENGECEK JAWABAN TEBAK GAMBAR
         // ==========================================
         if (activeTebakGambar[chat.id._serialized] && !msg.fromMe && !msg.body.startsWith('!')) {
@@ -718,6 +785,63 @@ _Bot siap melayani grup ini!_`);
 
             // PERBAIKAN: Menggunakan chat.sendMessage agar mention tidak error
             await chat.sendMessage(`📊 *CEK SEBERAPA ${sifat.toUpperCase()}* 📊\n\nTingkat *${sifat}* dari *@${targetUser}* adalah: *${persentase}%*!\n\n${komentar}`, { mentions: [targetId] });
+        }
+
+        // ==========================================
+        // 💞 FITUR KALKULATOR JODOH
+        // ==========================================
+        else if (command === '!jodoh') {
+            if (!chat.isGroup) return msg.reply('❌ Fitur ini hanya seru dipakai di grup!');
+            if (msg.mentionedIds.length < 2) return msg.reply('❌ Tag dua orang yang mau dicek kecocokannya!\nContoh: *!jodoh @Budi @Siti*');
+
+            const orang1 = msg.mentionedIds[0];
+            const orang2 = msg.mentionedIds[1];
+            
+            // Bikin persentase acak (0-100)
+            const persen = Math.floor(Math.random() * 101);
+            let komentar = "";
+
+            if (persen < 20) komentar = "💔 Mending cari yang lain deh, aura kalian tolak-menolak.";
+            else if (persen < 50) komentar = "🥀 Hmm... Butuh usaha dan modal ekstra keras nih biar langgeng.";
+            else if (persen < 80) komentar = "💖 Wah lumayan cocok! Gas terus pantang mundur!";
+            else komentar = "💍 JODOH PASTI BERTEMU! Fix langsung sebar undangan aja!";
+
+            await chat.sendMessage(`💞 *KALKULATOR CINTA* 💞\n\nPasangan: *@${orang1.split('@')[0]}* & *@${orang2.split('@')[0]}*\nKecocokan: *${persen}%*\n\n📝 ${komentar}`, { mentions: [orang1, orang2] });
+        }
+
+        // ==========================================
+        // ⭕ GAME TIC-TAC-TOE ❌
+        // ==========================================
+        else if (command === '!ttt' || command === '!tictactoe') {
+            if (!chat.isGroup) return msg.reply('❌ Hanya bisa dimainkan di dalam grup!');
+            if (activeTTT[chat.id._serialized]) return msg.reply('⚠️ Masih ada game Tic-Tac-Toe yang sedang berjalan di grup ini! Tunggu selesai atau ketik *!nyerahttt*');
+            if (msg.mentionedIds.length === 0) return msg.reply('❌ Tag orang yang mau diajak by-one!\nContoh: *!ttt @Budi*');
+            
+            let player1 = standardSenderId;
+            let player2 = msg.mentionedIds[0];
+            
+            if (player1 === player2) return msg.reply('❌ Lah, masa main lawan diri sendiri? Sedih amat!');
+            
+            // Bikin arena permainannya
+            activeTTT[chat.id._serialized] = {
+                playerX: player1,
+                playerO: player2,
+                turn: 'X',
+                board: ['1','2','3','4','5','6','7','8','9'],
+                moves: 0
+            };
+            
+            let papanAwal = `\`\`\` 1 | 2 | 3 \n---+---+---\n 4 | 5 | 6 \n---+---+---\n 7 | 8 | 9 \`\`\``;
+            
+            await chat.sendMessage(`🎮 *DUEL TIC-TAC-TOE* 🎮\n\n*@${player1.split('@')[0]}* (❌) VS *@${player2.split('@')[0]}* (⭕)\n\nGiliran pertama: *@${player1.split('@')[0]}*\n👉 *Ketik angka 1-9* untuk mengisi kotak:\n\n${papanAwal}`, {mentions: [player1, player2]});
+        }
+        else if (command === '!nyerahttt' || command === '!stopttt') {
+            if (activeTTT[chat.id._serialized]) {
+                delete activeTTT[chat.id._serialized];
+                msg.reply('🏳️ Game Tic-Tac-Toe telah dihentikan secara paksa.');
+            } else {
+                msg.reply('❌ Tidak ada game Tic-Tac-Toe yang sedang berjalan.');
+            }
         }
 
         // ==========================================
@@ -1012,7 +1136,7 @@ _Bot siap melayani grup ini!_`);
                 '!kuis', '!saldo', '!tebak', '!belikebal', 
                 '!tagall', '!setgelar', '!kick', '!promote', '!demote', 
                 '!tutupgrup', '!bukagrup', '!blacklist', '!bukablacklist', '!hapus',
-                '!warn', '!lirik'
+                '!warn', '!lirik', '!sambungkata', '!sambungkata', '!ttt', '!jodoh'
             ];
 
             let pesanStatus = "⚙️ *STATUS FITUR BOT SAAT INI* ⚙️\n\n";
@@ -2175,7 +2299,47 @@ else if (['!tagall', '!kick', '!promote', '!demote', '!tutupgrup', '!bukagrup', 
             msg.reply('⚠️ Bot sudah aktif.');
         }
     }
-} // <--- Penutup blok utama perintah admin
+}
+    }
+});
+
+// ==========================================
+// 👋 SISTEM AUTO-WELCOME & AUTO-LEAVE
+// ==========================================
+client.on('group_join', async (notification) => {
+    try {
+        const chat = await notification.getChat();
+        // Cek apakah fitur auto-welcome dimatikan di !fitur
+        if (disabledFeatures.includes('autowelcome')) return;
+
+        const contactIds = notification.recipientIds;
+        for (let userId of contactIds) {
+            let standardId = userId;
+            if (standardId.includes(':')) standardId = standardId.split(':')[0] + '@c.us';
+
+            const welcomeMsg = `🎉 Selamat datang *@${standardId.split('@')[0]}* di grup *${chat.name}*!\n\nJangan lupa intro, patuhi rules grup, dan ketik *!menu* untuk melihat daftar fitur bot ya! Selamat bergabung! 🥳`;
+            await chat.sendMessage(welcomeMsg, { mentions: [standardId] });
+        }
+    } catch (error) {
+        console.log("Error Welcome:", error);
+    }
+});
+
+client.on('group_leave', async (notification) => {
+    try {
+        const chat = await notification.getChat();
+        if (disabledFeatures.includes('autowelcome')) return;
+
+        const contactIds = notification.recipientIds;
+        for (let userId of contactIds) {
+            let standardId = userId;
+            if (standardId.includes(':')) standardId = standardId.split(':')[0] + '@c.us';
+
+            const leaveMsg = `👋 Yahh... *@${standardId.split('@')[0]}* telah keluar dari grup.\n\nSemoga sukses di luar sana! Terima kasih sudah pernah mampir. 🥀`;
+            await chat.sendMessage(leaveMsg, { mentions: [standardId] });
+        }
+    } catch (error) {
+        console.log("Error Leave:", error);
     }
 });
 
