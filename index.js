@@ -212,21 +212,22 @@ client.on('message', async (msg) => {
     const chat = await msg.getChat();
 
     // ==========================================
-    // 1. SISTEM ID ANTI-ERROR (MULTI-DEVICE)
+    // 1. SISTEM ID ANTI-ERROR (MULTI-DEVICE) - REVISI FINAL
     // ==========================================
-    let standardSenderId = msg.author || msg.from; 
+    // Menggunakan getContact() agar PASTI mendapatkan ID pengguna (bukan ID grup)
+    const senderContact = await msg.getContact();
+    let standardSenderId = senderContact.id._serialized; 
     
     // Membersihkan ID dari kode perangkat (misal :1, :2) agar WA Web/HP sama saja
     if (standardSenderId && standardSenderId.includes(':')) {
         standardSenderId = standardSenderId.split(':')[0] + '@c.us';
     }
 
-    const senderContact = await msg.getContact();
-    const senderNumber = senderContact.number || standardSenderId.split('@')[0]; 
+    const senderNumber = standardSenderId.split('@')[0]; 
 
     const isPrivateChat = !chat.isGroup;
     
-    // Pengecekan Owner HARUS di sini (setelah ID-nya bersih)
+    // Pengecekan Owner HARUS di sini (setelah ID-nya bersih dan akurat)
     const isSudo = sudoUsers.includes(standardSenderId);
 
     // Deteksi apakah ini pesan menfess dari chat pribadi
