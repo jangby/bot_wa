@@ -211,22 +211,22 @@ client.on('ready', () => {
 client.on('message', async (msg) => {
     const chat = await msg.getChat();
 
-    // 1. Definisikan ID pengirim dulu agar bisa dicek sudo/owner-nya
     // ==========================================
-    // 1. PERBAIKAN: METODE ID ANTI-ERROR & MULTI-DEVICE
+    // 1. SISTEM ID ANTI-ERROR (MULTI-DEVICE)
     // ==========================================
     let standardSenderId = msg.author || msg.from; 
     
-    // Hilangkan kode perangkat (misal :1 atau :2) agar ID selalu murni
-    if (standardSenderId.includes(':')) {
+    // Membersihkan ID dari kode perangkat (misal :1, :2) agar WA Web/HP sama saja
+    if (standardSenderId && standardSenderId.includes(':')) {
         standardSenderId = standardSenderId.split(':')[0] + '@c.us';
     }
 
     const senderContact = await msg.getContact();
-    // Mengambil nomor WA dengan aman
     const senderNumber = senderContact.number || standardSenderId.split('@')[0]; 
 
     const isPrivateChat = !chat.isGroup;
+    
+    // Pengecekan Owner HARUS di sini (setelah ID-nya bersih)
     const isSudo = sudoUsers.includes(standardSenderId);
 
     // Deteksi apakah ini pesan menfess dari chat pribadi
@@ -244,7 +244,12 @@ client.on('message', async (msg) => {
             const bot = participants.find(p => p.id._serialized === botId);
             isBotAdmin = bot?.isAdmin || bot?.isSuperAdmin;
 
-            const sender = participants.find(p => p.id._serialized === standardSenderId);
+            // Memastikan pencarian jabatan Admin Grup juga kebal dari Multi-Device
+            const sender = participants.find(p => {
+                let partId = p.id._serialized;
+                if (partId.includes(':')) partId = partId.split(':')[0] + '@c.us';
+                return partId === standardSenderId;
+            });
             isSenderAdmin = sender?.isAdmin || sender?.isSuperAdmin;
         }
 
