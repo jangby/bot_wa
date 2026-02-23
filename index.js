@@ -212,22 +212,37 @@ client.on('message_create', async (msg) => {
     const chat = await msg.getChat();
 
     // ==========================================
-    // 1. SISTEM ID PENGIRIM (BULLETPROOF)
+    // 1. SISTEM ID PENGIRIM (ANTI-BUG)
     // ==========================================
-    let standardSenderId = msg.author || msg.from; 
+    let standardSenderId;
+
+    // 👇 INI YANG KEMARIN HILANG: Ngecek kalau yang ngetik adalah nomor bot itu sendiri
+    if (msg.fromMe) {
+        standardSenderId = client.info.wid._serialized;
+    } else {
+        // Jika orang lain yang ngetik (msg.author untuk grup, msg.from untuk japri)
+        standardSenderId = msg.author || msg.from; 
+    }
     
     // Membersihkan ID dari kode perangkat (misal :1, :2)
     if (standardSenderId && standardSenderId.includes(':')) {
         standardSenderId = standardSenderId.split(':')[0] + '@c.us';
     }
 
+    // Jika entah kenapa WA masih membaca sebagai grup (bug langka)
+    if (standardSenderId && standardSenderId.includes('@g.us')) {
+        const contact = await msg.getContact();
+        standardSenderId = contact.id._serialized;
+        if (standardSenderId.includes(':')) {
+            standardSenderId = standardSenderId.split(':')[0] + '@c.us';
+        }
+    }
+
     const senderNumber = standardSenderId.split('@')[0]; 
     const isPrivateChat = !chat.isGroup;
     const senderContact = await msg.getContact();
-
-    // 👇👇👇 TAMBAHKAN BARIS INI (SANGAT PENTING!) 👇👇👇
+    
     const participants = chat.isGroup ? chat.participants : [];
-    // 👆👆👆 ========================================= 👆👆👆
 
     // ==========================================
     // 2. PENGECEKAN OTORITAS (OWNER & ADMIN)
@@ -238,20 +253,23 @@ client.on('message_create', async (msg) => {
     let isSenderAdmin = false;
 
     if (chat.isGroup) {
-        // PERBAIKAN: Gunakan _serialized agar sistem anti-bug dan tidak error
         let botId = client.info.wid._serialized;
         if (botId.includes(':')) botId = botId.split(':')[0] + '@c.us';
         const bot = participants.find(p => p.id._serialized === botId);
         isBotAdmin = bot?.isAdmin || bot?.isSuperAdmin;
 
-        // Pengecekan Pengirim Admin
         const sender = participants.find(p => p.id._serialized === standardSenderId);
         isSenderAdmin = sender?.isAdmin || sender?.isSuperAdmin;
     }
 
-    // [OPSIONAL] Log debugging buat kamu di terminal biar tau kalau ada yang error
+    // Log debugging supaya kita bisa lihat di terminal kalau ada error lagi
     if (msg.body.startsWith('!blacklist')) {
-        console.log(`[DEBUG OTORITAS] ID: ${standardSenderId} | Sudo: ${isSudo} | Admin: ${isSenderAdmin}`);
+        console.log(`\n=== CEK OTORITAS ===`);
+        console.log(`ID Pengirim : ${standardSenderId}`);
+        console.log(`Status Owner: ${isSudo}`);
+        console.log(`Status Admin: ${isSenderAdmin}`);
+        console.log(`Bot Admin?  : ${isBotAdmin}`);
+        console.log(`====================\n`);
     }
 
     // Deteksi apakah ini pesan menfess dari chat pribadi
