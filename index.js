@@ -17,6 +17,9 @@ const fs = require('fs');
 let activeTebakGambar = {};
 let activeSambungKata = {};
 let activeTTT = {};
+let pendingTopup = {}; // Menyimpan tiket top up yang menunggu verifikasi
+let inventory = {};    // Menyimpan tas/barang milik member
+let activeLakban = {}; // Menyimpan status efek item lakban hitam
 // Variabel untuk menyimpan puluhan ribu kata di RAM (sangat ringan karena menggunakan Set)
 let kamusIndonesia = new Set();
 
@@ -355,6 +358,20 @@ client.on('message_create', async (msg) => {
             }
         }
 
+        // ==========================================
+        // 🤐 EFEK ITEM TOKO: LAKBAN HITAM
+        // ==========================================
+        // Jika pengirim sedang dilakban dan belum habis waktunya
+        if (activeLakban[standardSenderId] && activeLakban[standardSenderId] > Date.now()) {
+            // Bot hanya bisa menghapus pesan member biasa (bukan Admin/Owner)
+            if (isBotAdmin && !isSenderAdmin && !isSudo) {
+                try {
+                    await msg.delete(true);
+                    return; // Bot diam dan membuang pesan tersebut
+                } catch (e) { console.log('Gagal efek lakban', e); }
+            }
+        }
+
 
         // ==========================================
         // 🛑 SISTEM EKSEKUSI BLACKLIST 
@@ -406,6 +423,36 @@ client.on('message_create', async (msg) => {
                     }
                     msg.reply('❌ Pembayaran ditolak. Notifikasi telah dikirim.');
                     delete pendingPremium[quotedMsg.id._serialized];
+                    return; 
+                }
+            }
+
+            // --- VERIFIKASI TOP UP POIN ---
+            if (quotedMsg.fromMe && pendingTopup[quotedMsg.id._serialized]) {
+                const data = pendingTopup[quotedMsg.id._serialized];
+                const replyText = msg.body.trim().toUpperCase();
+                
+                if (replyText.startsWith('YA')) {
+                    // Memecah balasan Owner (Contoh: "YA 100")
+                    const parts = replyText.split(' ');
+                    const jumlahPoin = parseInt(parts[1]);
+                    
+                    if (isNaN(jumlahPoin) || jumlahPoin <= 0) {
+                        return msg.reply('❌ Format salah! Harap balas dengan: *YA [Jumlah]*\nContoh: *YA 100*');
+                    }
+                    
+                    let player = getPlayer(data.userId);
+                    player.points += jumlahPoin; // Menambahkan poin ke rekening user
+                    
+                    await client.sendMessage(data.chatId, `🎉 *TOP UP BERHASIL!* 🎉\n\nSelamat *@${data.userId.split('@')[0]}*, Top Up sebesar *${jumlahPoin} Poin* telah masuk ke rekeningmu! 💰\n\nKetik *!saldo* untuk mengecek saldo terbarumu.`, { mentions: [data.userId] });
+                    msg.reply(`✅ Berhasil menambahkan ${jumlahPoin} poin ke user.`);
+                    delete pendingTopup[quotedMsg.id._serialized];
+                    return; 
+                } 
+                else if (replyText === 'TIDAK') {
+                    await client.sendMessage(data.chatId, `❌ Mohon maaf *@${data.userId.split('@')[0]}*, pengajuan Top Up Poin kamu DITOLAK oleh Owner. Pastikan bukti transfer valid.`, { mentions: [data.userId] });
+                    msg.reply('❌ Top Up ditolak.');
+                    delete pendingTopup[quotedMsg.id._serialized];
                     return; 
                 }
             }
@@ -1904,17 +1951,171 @@ Teks yang harus diterjemahkan:
         // 🎮 MINI GAME: TEBAK ANGKA & SISTEM POIN
         // ==========================================
 
-        // 1. Cek Saldo dan Status Kebal
+        // ==========================================
+        // 💳 CEK SALDO & TOP UP POIN
+        // ==========================================
         else if (command === '!saldo') {
-            let player = getPlayer(standardSenderId);
-            let statusKebal = "Tidak Aktif ❌";
-            
-            // Mengecek apakah waktu kebal masih berlaku (lebih besar dari waktu sekarang)
-            if (player.kebalUntil > Date.now()) {
-                let sisaJam = Math.ceil((player.kebalUntil - Date.now()) / (1000 * 60 * 60));
-                statusKebal = `AKTIF 🛡️ (Sisa ${sisaJam} Jam)`;
+            // JIKA ADA GAMBAR (BERARTI MAU TOP UP)
+            if (msg.hasMedia) {
+                if (!chat.isGroup) return msg.reply('❌ Top up hanya bisa dilakukan di grup.');
+                if (args.length === 0) return msg.reply('❌ Format salah! Sertakan nama di caption.\nContoh: *!saldo Budi*');
+                
+                const namaPembeli = args.join(' ');
+                msg.reply('⏳ Bukti transfer dikirim ke Owner untuk diverifikasi. Mohon tunggu...');
+
+                try {
+                    const media = await msg.downloadMedia();
+                    // Mengirim tiket ke Owner
+                    const ownerMsg = await client.sendMessage(sudoUsers[0], media, { caption: `💰 *PERMINTAAN TOP UP SALDO*\n\nNama: ${namaPembeli}\nNomor: ${senderNumber}\nGrup: ${chat.name}\n\n_Balas dengan *YA [Jumlah Poin]* atau *TIDAK*_\n_Contoh untuk acc 100 poin: *YA 100*_` });
+                    
+                    pendingTopup[ownerMsg.id._serialized] = {
+                        userId: standardSenderId,
+                        chatId: chat.id._serialized
+                    };
+                } catch (err) { msg.reply('❌ Gagal mengirim bukti ke Owner.'); }
+
+            // JIKA TIDAK ADA GAMBAR (CUMA CEK SALDO BIASA ATAU LIHAT HARGA)
+            } else {
+                let player = getPlayer(standardSenderId);
+                let statusKebal = "Tidak Aktif ❌";
+                
+                if (player.kebalUntil > Date.now()) {
+                    let sisaJam = Math.ceil((player.kebalUntil - Date.now()) / (1000 * 60 * 60));
+                    statusKebal = `AKTIF 🛡️ (Sisa ${sisaJam} Jam)`;
+                }
+                
+                let pesanSaldo = `*💳 BUKU REKENING*\n\n💰 Saldo Poin: *${player.points}*\n🛡️ Status Kebal VIP: *${statusKebal}*\n\n`;
+                pesanSaldo += `💸 *MAU TOP UP POIN?*\nRate: *Rp 1.000 = 100 Poin*\n_Cara Top Up: Transfer dana ke Owner, lalu kirim SS bukti transfer ke grup ini dengan caption: *!saldo [Nama]*_`;
+                
+                msg.reply(pesanSaldo);
             }
-            msg.reply(`*💳 BUKU REKENING*\n\n💰 Saldo Poin: *${player.points}*\n🛡️ Status Kebal VIP: *${statusKebal}*`);
+        }
+
+        // ==========================================
+        // 🛒 TOKO ITEM & INVENTORY (STORE)
+        // ==========================================
+        else if (command === '!store' || command === '!toko') {
+            let katalog = `🛒 *TOKO POIN ANGKATAN* 🛒\n_Habiskan poinmu untuk membeli item menarik!_\n\n`;
+            katalog += `*1. Tiket Gelar (🎟️ tiketgelar)* - 300 Poin\n_Bikin julukan/gelarmu sendiri tanpa perlu Admin._\n`;
+            katalog += `*2. Lakban Hitam (🤐 lakban)* - 200 Poin\n_Bungkam temanmu! Pesan dia di grup akan dihapus bot selama 3 Menit._\n`;
+            katalog += `*3. Sarung Tangan Copet (🕵️ copet)* - 100 Poin\n_Curi poin teman secara acak. Awas, kalau gagal kamu yang kena denda!_\n\n`;
+            katalog += `👉 Cara beli: *!beli [nama_item]*\nContoh: *!beli lakban*`;
+            
+            msg.reply(katalog);
+        }
+
+        else if (command === '!beli') {
+            if (args.length === 0) return msg.reply('❌ Tulis nama item yang mau dibeli!\nContoh: *!beli lakban*');
+            const itemDibeli = args[0].toLowerCase();
+            
+            const daftarHarga = { 'tiketgelar': 300, 'lakban': 200, 'copet': 100 };
+            
+            if (!daftarHarga[itemDibeli]) return msg.reply('❌ Item tidak ditemukan di Toko! Cek katalog dengan *!store*.');
+            
+            let player = getPlayer(standardSenderId);
+            const harga = daftarHarga[itemDibeli];
+            
+            if (player.points < harga) return msg.reply(`💸 Poinmu tidak cukup! Harga ${itemDibeli} adalah ${harga} Poin.\nSaldo kamu: *${player.points}*`);
+            
+            // Kurangi poin
+            player.points -= harga;
+            
+            // Masukkan item ke tas
+            if (!inventory[standardSenderId]) inventory[standardSenderId] = {};
+            if (!inventory[standardSenderId][itemDibeli]) inventory[standardSenderId][itemDibeli] = 0;
+            inventory[standardSenderId][itemDibeli] += 1;
+            
+            msg.reply(`✅ *PEMBELIAN SUKSES!*\nKamu berhasil membeli 1x *${itemDibeli}*.\nKetik *!tas* untuk melihat barang bawaanmu.`);
+        }
+
+        else if (command === '!tas' || command === '!inventory') {
+            let tasUser = inventory[standardSenderId];
+            if (!tasUser || Object.keys(tasUser).length === 0) return msg.reply('🧳 Tas kamu masih kosong. Beli item dulu di *!store*.');
+            
+            let isiTas = `🧳 *TAS BARANG BAWAAN* 🧳\n\n`;
+            for (let item in tasUser) {
+                if (tasUser[item] > 0) isiTas += `- ${item} : *${tasUser[item]} buah*\n`;
+            }
+            isiTas += `\n👉 Cara pakai: *!pakai [nama_item] [@user]*`;
+            msg.reply(isiTas);
+        }
+
+        else if (command === '!pakai') {
+            if (args.length === 0) return msg.reply('❌ Pilih item yang mau dipakai!\nContoh: *!pakai lakban @Doni*');
+            
+            let itemDipakai = args[0].toLowerCase();
+            let tasUser = inventory[standardSenderId];
+            
+            if (!tasUser || !tasUser[itemDipakai] || tasUser[itemDipakai] <= 0) {
+                return msg.reply(`❌ Kamu tidak punya *${itemDipakai}* di dalam tas! Beli dulu di *!store*.`);
+            }
+
+            // --- LAKBAN HITAM ---
+            if (itemDipakai === 'lakban') {
+                if (!chat.isGroup) return msg.reply('❌ Item ini hanya bisa dipakai di grup!');
+                if (msg.mentionedIds.length === 0) return msg.reply('❌ Tag orang yang mau dilakban!\nContoh: *!pakai lakban @Doni*');
+                
+                const targetId = msg.mentionedIds[0];
+                
+                // Cek apakah target punya status kebal
+                let targetPlayer = getPlayer(targetId);
+                if (targetPlayer.kebalUntil > Date.now() || sudoUsers.includes(targetId)) {
+                    tasUser[itemDipakai] -= 1; // Item tetap hangus
+                    return msg.reply('⚠️ *GAGAL LAKBAN!* Target memakai ilmu Kebal VIP atau Owner! Item lakbanmu hangus.');
+                }
+
+                // Kurangi item dari tas dan aktifkan efek 3 Menit (3 * 60 * 1000 ms)
+                tasUser[itemDipakai] -= 1;
+                activeLakban[targetId] = Date.now() + 180000;
+                
+                await chat.sendMessage(`🤐 *CRAAAT!* 🤐\n\nMulut *@${targetId.split('@')[0]}* berhasil dilakban hitam oleh *@${senderContact.id.user}*!\n\nSelama *3 Menit ke depan*, semua pesan dia di grup ini akan otomatis dihapus oleh bot!`, { mentions: [targetId, standardSenderId] });
+            }
+            
+            // --- TIKET GELAR ---
+            else if (itemDipakai === 'tiketgelar') {
+                if (args.length < 2) return msg.reply('❌ Masukkan nama gelar yang kamu inginkan!\nContoh: *!pakai tiketgelar Raja Bucin*');
+                
+                const namaGelar = args.slice(1).join(' ');
+                
+                tasUser[itemDipakai] -= 1;
+                gelarAngkatan[standardSenderId] = namaGelar; // Memasukkan ke database gelar
+                
+                msg.reply(`👑 *GELAR BARU!*\n\nSelamat! Kamu resmi menggunakan tiket untuk mengubah gelarmu menjadi:\n*${namaGelar}*`);
+            }
+
+            // --- COPET ---
+            else if (itemDipakai === 'copet') {
+                if (!chat.isGroup) return msg.reply('❌ Item ini hanya bisa dipakai di grup!');
+                if (msg.mentionedIds.length === 0) return msg.reply('❌ Tag orang yang mau dicopet!\nContoh: *!pakai copet @Budi*');
+                
+                const targetId = msg.mentionedIds[0];
+                if (targetId === standardSenderId) return msg.reply('❌ Masa nyopet kantong sendiri?');
+
+                let targetPlayer = getPlayer(targetId);
+                let myPlayer = getPlayer(standardSenderId);
+
+                tasUser[itemDipakai] -= 1; // Kurangi item
+
+                // Peluang 50% Berhasil, 50% Gagal
+                const isBerhasil = Math.random() > 0.5;
+
+                if (isBerhasil) {
+                    // Berhasil nyopet 20 - 50 Poin
+                    let hasilCopet = Math.floor(Math.random() * 31) + 20;
+                    
+                    // Jika poin target kurang dari hasil copet, ambil semua sisanya saja
+                    if (targetPlayer.points < hasilCopet) hasilCopet = targetPlayer.points;
+                    
+                    targetPlayer.points -= hasilCopet;
+                    myPlayer.points += hasilCopet;
+                    
+                    await chat.sendMessage(`🕵️‍♂️ *COPET BERHASIL!* 🕵️‍♂️\n\nKamu mengendap-endap dan berhasil mencuri *${hasilCopet} Poin* dari kantong *@${targetId.split('@')[0]}*!`, { mentions: [targetId] });
+                } else {
+                    // Gagal, kena denda 30 Poin
+                    myPlayer.points -= 30;
+                    await chat.sendMessage(`🚨 *TETOOOT! KETAHUAN!* 🚨\n\nUsaha copetmu ke *@${targetId.split('@')[0]}* gagal total! Kamu malah digebukin warga dan didenda *-30 Poin*.`, { mentions: [targetId] });
+                }
+            }
         }
 
         // 2. Game Tebak Angka
