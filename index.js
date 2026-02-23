@@ -30,6 +30,7 @@ let lokerAngkatan = [];
 let jombloAngkatan = {};
 let gelarAngkatan = {};
 let kapsulWaktu = [];
+let warnData = {};
 const daftarKhodam = [
     // --- HEWAN & MAKHLUK AJAIB ---
     "Macan Cisewu (Keliatannya garang tapi aslinya gemesin)",
@@ -305,6 +306,22 @@ client.on('message_create', async (msg) => {
                     return; 
                 } catch (e) { 
                     console.log('Gagal hapus kata kasar:', e); 
+                }
+            }
+        }
+
+        // ==========================================
+        // 3. Eksekusi Anti-Virtex / Anti-Bug (Teks Super Panjang)
+        // ==========================================
+        // Teks normal biasanya tidak lebih dari 4000-5000 karakter. Virtex biasanya puluhan ribu.
+        if (msg.body.length > 10000 && !disabledFeatures.includes('antivirtex')) {
+            if (isBotAdmin && !isSenderAdmin && !isSudo) {
+                try {
+                    await msg.delete(true);
+                    await chat.removeParticipants([standardSenderId]); // Langsung KICK pelakunya
+                    return chat.sendMessage(`🚨 *SISTEM KEAMANAN AKTIF* 🚨\n\nTerdeteksi pengiriman teks spam/bug/virtex dari @${senderContact.id.user}. Pelaku telah otomatis dikeluarkan dari grup demi keamanan WhatsApp anggota lain!`, { mentions: [standardSenderId] });
+                } catch (e) {
+                    console.log('Gagal eksekusi Anti-Virtex:', e);
                 }
             }
         }
@@ -1598,6 +1615,35 @@ Teks yang harus diterjemahkan:
         }
 
         // ==========================================
+        // 🎵 FITUR PENCARI LIRIK LAGU (!lirik)
+        // ==========================================
+        else if (command === '!lirik') {
+            if (args.length === 0) return msg.reply('❌ Masukkan judul lagunya!\nContoh: *!lirik Sempurna Andra and the Backbone*');
+            
+            const judulLagu = args.join(' ');
+            msg.reply(`⏳ Sedang mencari lirik lagu *${judulLagu}*...`);
+
+            try {
+                // Menggunakan API gratis dari popcat
+                const response = await fetch(`https://api.popcat.xyz/lyrics?song=${encodeURIComponent(judulLagu)}`);
+                const data = await response.json();
+
+                if (data.lyrics) {
+                    let pesanLirik = `🎵 *${data.title}* 🎵\n`;
+                    pesanLirik += `🎤 Artist: *${data.artist}*\n\n`;
+                    pesanLirik += `${data.lyrics}`;
+                    
+                    msg.reply(pesanLirik);
+                } else {
+                    msg.reply(`❌ Lirik lagu *${judulLagu}* tidak ditemukan di database.`);
+                }
+            } catch (error) {
+                console.log("Error Lirik:", error);
+                msg.reply('❌ Gagal mengambil lirik. Server API mungkin sedang gangguan.');
+            }
+        }
+
+        // ==========================================
         // 🎮 MINI GAME: TEBAK ANGKA & SISTEM POIN
         // ==========================================
 
@@ -1697,7 +1743,7 @@ Teks yang harus diterjemahkan:
 
 // Mengelompokkan perintah admin untuk dicek otoritasnya sekaligus
 // Mengelompokkan perintah admin untuk dicek otoritasnya sekaligus
-else if (['!tagall', '!kick', '!promote', '!demote', '!tutupgrup', '!bukagrup', '!blacklist', '!bukablacklist', '!on', '!off', '!zoom', '!meet', '!terlarang', '!listterlarang', '!hapus'].includes(command)) {
+else if (['!tagall', '!kick', '!promote', '!demote', '!tutupgrup', '!bukagrup', '!blacklist', '!bukablacklist', '!on', '!off', '!zoom', '!meet', '!terlarang', '!listterlarang', '!hapus', '!warn'].includes(command)) {
 
     // 1. Pastikan perintah ini HANYA di grup
     if (!chat.isGroup) {
@@ -1720,6 +1766,40 @@ else if (['!tagall', '!kick', '!promote', '!demote', '!tutupgrup', '!bukagrup', 
         }
         await chat.sendMessage(text, { mentions });
     } 
+
+    // ==========================================
+        // 🛡️ FITUR SURAT PERINGATAN (!warn) - Khusus Admin
+        // ==========================================
+        else if (command === '!warn') {
+            if (!chat.isGroup) return msg.reply('❌ Hanya bisa di grup!');
+            if (!isSenderAdmin && !isSudo) return msg.reply('❌ Hanya Admin yang bisa memberi peringatan!');
+            if (msg.mentionedIds.length === 0) return msg.reply('❌ Tag orang yang mau di-warn!\nContoh: *!warn @Budi Sering spam stiker*');
+
+            const targetId = msg.mentionedIds[0];
+            const alasan = args.slice(1).join(' ') || "Melanggar aturan grup";
+
+            // Pastikan tidak me-warn Owner atau sesama Admin
+            if (sudoUsers.includes(targetId)) return msg.reply('⚠️ Kamu tidak bisa memberi peringatan kepada Owner!');
+
+            if (!warnData[chat.id._serialized]) warnData[chat.id._serialized] = {};
+            if (!warnData[chat.id._serialized][targetId]) warnData[chat.id._serialized][targetId] = 0;
+
+            warnData[chat.id._serialized][targetId] += 1;
+            const jumlahWarn = warnData[chat.id._serialized][targetId];
+
+            if (jumlahWarn >= 3) {
+                // Jika sudah 3 kali warn, otomatis kick (jika bot admin)
+                if (isBotAdmin) {
+                    await chat.removeParticipants([targetId]);
+                    delete warnData[chat.id._serialized][targetId]; // Reset warn setelah di-kick
+                    await chat.sendMessage(`🚨 *@${targetId.split('@')[0]}* telah mencapai *3 Surat Peringatan* dan resmi *DIKELUARKAN* dari grup!`, { mentions: [targetId] });
+                } else {
+                    await chat.sendMessage(`⚠️ *@${targetId.split('@')[0]}* sudah kena 3x peringatan! Admin tolong kick orang ini karena bot belum jadi Admin.`, { mentions: [targetId] });
+                }
+            } else {
+                await chat.sendMessage(`⚠️ *SURAT PERINGATAN (SP ${jumlahWarn}/3)* ⚠️\n\nTarget: *@${targetId.split('@')[0]}*\nAlasan: ${alasan}\n\n_Hati-hati, jika mencapai 3x peringatan, sistem akan mengeluarkanmu secara otomatis!_`, { mentions: [targetId] });
+            }
+        }
     
     else if (command === '!terlarang') {
         const kataBaru = args[0]?.toLowerCase();
