@@ -230,7 +230,7 @@ const client = new Client({
     ffmpegPath: 'ffmpeg',
     // Tambahkan blok webVersionCache ini
     webVersionCache: {
-        type: 'local'
+        type: 'none'
     },
     puppeteer: {
         headless: true,
