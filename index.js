@@ -1,3 +1,11 @@
+process.on('unhandledRejection', (reason, promise) => {
+    // Mengabaikan error background dari Puppeteer/WhatsApp Web
+    if (reason && reason.name === 'ProtocolError' && reason.message.includes('Network.getResponseBody')) {
+        console.log('⚠️ [SISTEM] Mengabaikan error cache WhatsApp Web, bot tetap berjalan...');
+        return;
+    }
+    console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+});
 const { Client, LocalAuth, MessageMedia } = require('whatsapp-web.js');
 const qrcode = require('qrcode-terminal');
 const { GoogleGenerativeAI } = require("@google/generative-ai");
