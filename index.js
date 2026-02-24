@@ -235,14 +235,10 @@ function formatUptime(seconds) {
 
 const client = new Client({
     authStrategy: new LocalAuth(),
-    ffmpegPath: 'ffmpeg',
-    webVersionCache: {
-        type: 'none'
-    },
-    authTimeoutMs: 0, // Mematikan batas waktu loading (wajib untuk VPS)
-    qrMaxRetries: 5,  // Memberi kesempatan 5 kali untuk refresh QR Code
+    ffmpegPath: 'ffmpeg', // Pastikan ffmpeg sudah terinstall, jika belum hapus baris ini
+    // webVersionCache: { type: 'none' }, <--- HAPUS ATAU KOMENTARI BARIS INI (Biar stabil)
     puppeteer: {
-        headless: true,
+        headless: true, // Ubah ke false jika ingin melihat browsernya muncul (untuk debugging)
         args: [
             '--no-sandbox',
             '--disable-setuid-sandbox',
@@ -250,10 +246,8 @@ const client = new Client({
             '--disable-accelerated-2d-canvas',
             '--no-first-run',
             '--no-zygote',
-            '--single-process',
-            '--disable-gpu',
-            '--disable-web-security',
-            '--disable-features=IsolateOrigins,site-per-process'
+            // '--single-process', <--- INI PENYEBAB ERROR DI WINDOWS (HAPUS)
+            '--disable-gpu'
         ],
     }
 });
