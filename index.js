@@ -228,10 +228,6 @@ function formatUptime(seconds) {
 const client = new Client({
     authStrategy: new LocalAuth(),
     ffmpegPath: 'ffmpeg',
-    // Tambahkan blok webVersionCache ini
-    webVersionCache: {
-        type: 'none'
-    },
     puppeteer: {
         headless: true,
         args: [
@@ -242,7 +238,9 @@ const client = new Client({
             '--no-first-run',
             '--no-zygote',
             '--single-process',
-            '--disable-gpu'
+            '--disable-gpu',
+            '--disable-web-security',
+            '--disable-features=IsolateOrigins,site-per-process'
         ],
     }
 });
