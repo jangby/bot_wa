@@ -227,7 +227,6 @@ function formatUptime(seconds) {
 
 const client = new Client({
     authStrategy: new LocalAuth(),
-    ffmpegPath: 'ffmpeg',
     puppeteer: {
         headless: true,
         args: [
@@ -237,7 +236,7 @@ const client = new Client({
             '--disable-accelerated-2d-canvas',
             '--no-first-run',
             '--no-zygote',
-            '--single-process', // Menambah kestabilan di RAM kecil
+            '--single-process', // <- Tambahkan ini jika di VPS spek rendah
             '--disable-gpu'
         ],
     }
