@@ -236,10 +236,11 @@ function formatUptime(seconds) {
 const client = new Client({
     authStrategy: new LocalAuth(),
     ffmpegPath: 'ffmpeg',
-    // INI BARIS YANG TERLEWAT SEBELUMNYA:
-    webVersionCache: { 
-        type: 'none' 
+    webVersionCache: {
+        type: 'none'
     },
+    authTimeoutMs: 0, // Mematikan batas waktu loading (wajib untuk VPS)
+    qrMaxRetries: 5,  // Memberi kesempatan 5 kali untuk refresh QR Code
     puppeteer: {
         headless: true,
         args: [
