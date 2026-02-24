@@ -227,6 +227,12 @@ function formatUptime(seconds) {
 
 const client = new Client({
     authStrategy: new LocalAuth(),
+    ffmpegPath: 'ffmpeg',
+    // Tambahkan baris webVersionCache di bawah ini
+    webVersionCache: {
+        type: 'remote',
+        remotePath: 'https://raw.githubusercontent.com/wppconnect-team/wa-version/main/html/2.3000.1018591322-alpha.html',
+    },
     puppeteer: {
         headless: true,
         args: [
@@ -236,7 +242,7 @@ const client = new Client({
             '--disable-accelerated-2d-canvas',
             '--no-first-run',
             '--no-zygote',
-            '--single-process', // <- Tambahkan ini jika di VPS spek rendah
+            '--single-process',
             '--disable-gpu'
         ],
     }
