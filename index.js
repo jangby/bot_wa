@@ -228,6 +228,10 @@ function formatUptime(seconds) {
 const client = new Client({
     authStrategy: new LocalAuth(),
     ffmpegPath: 'ffmpeg',
+    // INI BARIS YANG TERLEWAT SEBELUMNYA:
+    webVersionCache: { 
+        type: 'none' 
+    },
     puppeteer: {
         headless: true,
         args: [
