@@ -1,0 +1,18 @@
+{
+  "6285136468097@c.us": {
+    "balance": 3255445,
+    "inventory": {
+      "cincin": 1,
+      "obat": 2,
+      "tuyul": 2
+    }
+  },
+  "6282117556309@c.us": {
+    "balance": 1315568,
+    "inventory": {
+      "obat": 8,
+      "pancingan": 1,
+      "tuyul": 10
+    }
+  }
+}
