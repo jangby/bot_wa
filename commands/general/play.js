@@ -2,71 +2,59 @@ const { MessageMedia } = require('whatsapp-web.js');
 
 module.exports = {
     name: 'play',
-    description: 'Mencari dan memutar lagu dari YouTube (Multi-Server)',
+    description: 'Memutar lagu dari Spotify/Music API (Tanpa YouTube)',
     async execute(client, msg, args) {
         if (args.length === 0) {
-            return msg.reply('⚠️ Masukkan judul lagunya bro!\n\n*Contoh:* !play bahagia lagi');
+            return msg.reply('⚠️ Masukkan judul lagunya!\n\n*Contoh:* !play bahagia lagi');
         }
 
         const query = args.join(' ');
         await msg.react('⏳');
-        const loadingMsg = await msg.reply(`Tunggu ya, lagi nyari lagu *"${query}"* di gudang lagu... 🎧`);
+        const loadingMsg = await msg.reply(`Mencari lagu *"${query}"* di database musik... 🎵`);
 
         try {
-            // 1. CARI LAGU DI YOUTUBE
-            const searchRes = await fetch(`https://api.siputzx.my.id/api/s/youtube?query=${encodeURIComponent(query)}`);
-            const searchData = await searchRes.json();
+            // 1. Mencari lagu & mendapatkan link download dari API Spotify/Music
+            // Kita gunakan API serbaguna yang mencari ke database Spotify/Deezer
+            const response = await fetch(`https://api.siputzx.my.id/api/d/spotify?url=${encodeURIComponent(query)}`);
+            const resData = await response.json();
 
-            if (!searchData.status || !searchData.data || searchData.data.length === 0) {
-                throw new Error('Lagunya nggak ketemu di YouTube nih.');
-            }
-
-            const video = searchData.data[0];
-            const videoUrl = video.url;
-            const videoTitle = video.title;
-
-            let mp3Url = null;
-
-            // ========================================================
-            // SISTEM FALLBACK DOWNLOADER
-            // ========================================================
-
-            // PERCOBAAN 1: Pakai API AEMT (Sangat stabil buat YT)
-            try {
-                const res1 = await fetch(`https://api.aemt.me/youtube?url=${encodeURIComponent(videoUrl)}`);
-                const data1 = await res1.json();
-                if (data1.status && data1.result && data1.result.mp3) {
-                    mp3Url = data1.result.mp3;
-                    console.log('Sukses via API 1 (AEMT)');
+            // Cek apakah data lagu ditemukan
+            if (!resData.status || !resData.data) {
+                // Jika cara pertama gagal, coba alternatif pencarian musik lain
+                const altRes = await fetch(`https://api.siputzx.my.id/api/s/spotify?query=${encodeURIComponent(query)}`);
+                const altData = await altRes.json();
+                
+                if (!altData.status || !altData.data || altData.data.length === 0) {
+                    throw new Error('Lagu tidak ditemukan di database musik.');
                 }
-            } catch (e) { console.log('API 1 Gagal'); }
-
-            // PERCOBAAN 2: Jika API 1 Gagal, balik ke Siputzx tapi dengan endpoint berbeda
-            if (!mp3Url) {
-                try {
-                    const res2 = await fetch(`https://api.siputzx.my.id/api/d/ytmp3?url=${encodeURIComponent(videoUrl)}`);
-                    const data2 = await res2.json();
-                    if (data2.status && data2.data && data2.data.dl) {
-                        mp3Url = data2.data.dl;
-                        console.log('Sukses via API 2 (Siputzx)');
-                    }
-                } catch (e) { console.log('API 2 Gagal'); }
+                
+                // Ambil hasil pertama dari pencarian alternatif
+                const trackUrl = altData.data[0].url;
+                
+                // Coba download menggunakan link hasil pencarian tadi
+                const dlRes = await fetch(`https://api.siputzx.my.id/api/d/spotify?url=${encodeURIComponent(trackUrl)}`);
+                const dlData = await dlRes.json();
+                
+                if (!dlData.status) throw new Error('Gagal mengunduh file audio.');
+                var audioUrl = dlData.data.download;
+                var title = dlData.data.title;
+                var artist = dlData.data.artist;
+            } else {
+                var audioUrl = resData.data.download;
+                var title = resData.data.title;
+                var artist = resData.data.artist;
             }
 
-            if (!mp3Url) {
-                throw new Error('Semua server pengunduh lagu lagi sibuk. Coba lagi nanti ya!');
-            }
-
-            // ========================================================
-            // PROSES PENGIRIMAN
-            // ========================================================
-
-            const media = await MessageMedia.fromUrl(mp3Url, { unsafeMime: true, filename: `${videoTitle}.mp3` });
+            // 2. Download file audio dan kirim
+            const media = await MessageMedia.fromUrl(audioUrl, { 
+                unsafeMime: true, 
+                filename: `${title}.mp3` 
+            });
 
             await loadingMsg.delete(true).catch(() => {});
-            await msg.reply(`🎶 *Ditemukan:* ${videoTitle}\n\nSedang mengirim audio...`);
+            await msg.reply(`🎶 *Ditemukan:* ${title}\n👤 *Artis:* ${artist}\n\n_Mengirim dalam bentuk Voice Note..._`);
 
-            // Kirim sebagai VN (Voice Note)
+            // 3. Kirim sebagai Voice Note
             await msg.reply(media, null, { sendAudioAsVoice: true });
             await msg.react('✅');
 
@@ -74,7 +62,7 @@ module.exports = {
             console.error('Error Play Music:', error);
             await loadingMsg.delete(true).catch(() => {});
             await msg.react('❌');
-            msg.reply(`❌ Gagal memutar lagu.\n*Info:* ${error.message}`);
+            msg.reply(`❌ Gagal memutar lagu.\n*Info:* ${error.message}\n_Coba gunakan judul lagu dan nama artis agar lebih akurat._`);
         }
     }
 };
