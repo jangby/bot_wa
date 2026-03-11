@@ -1,53 +1,43 @@
 module.exports = {
     name: 'lirik',
-    description: 'Mencari lirik lagu (Multi-Server)',
+    description: 'Mencari lirik lagu menggunakan AI (Anti-Limit)',
     async execute(client, msg, args) {
         if (args.length === 0) return msg.reply('⚠️ Masukkan judul lagunya!\nContoh: *!lirik Komang*');
 
         const query = args.join(' ');
         await msg.react('🔍');
-        const loadingMsg = await msg.reply(`🔎 Mencari lirik *"${query}"*...`);
+        const loadingMsg = await msg.reply(`🔎 AI sedang mengingat lirik *"${query}"*...`);
 
         try {
-            // SERVER 1: API AlyaChan (Sangat Stabil)
-            let response = await fetch(`https://api.alyachan.pro/api/lyrics?q=${encodeURIComponent(query)}&apikey=GataDios`);
-            let json = await response.json();
+            // Kita gunakan API Gemini untuk mencari lirik
+            // Ini jauh lebih stabil karena database AI sangat besar
+            const aiRes = await fetch(`https://api.siputzx.my.id/api/ai/gemini?prompt=${encodeURIComponent(
+                `Tolong berikan lirik lagu lengkap dari "${query}". 
+                Format jawaban harus rapi: 
+                🎵 *Lirik Lagu ditemukan* 🎵
+                📌 *Judul:* [Judul]
+                👤 *Penyanyi:* [Artis]
+                ──────────────────
+                [Isi Lirik]
+                
+                Jangan berikan teks penjelasan lain, langsung format tersebut.`
+            )}`);
+            
+            const aiData = await aiRes.json();
 
-            let data = null;
-
-            if (json.status && json.data) {
-                data = json.data;
-            } else {
-                // SERVER 2: API Fallback (Siputzx New Path)
-                let res2 = await fetch(`https://api.siputzx.my.id/api/s/lyrics?query=${encodeURIComponent(query)}`);
-                let json2 = await res2.json();
-                if (json2.status && json2.data) data = json2.data;
+            if (!aiData.status || !aiData.data) {
+                throw new Error('AI tidak bisa menemukan lirik tersebut.');
             }
-
-            if (!data) {
-                throw new Error('Lirik tidak ditemukan di semua server.');
-            }
-
-            // Destructuring data (menyesuaikan format API)
-            const title = data.title || data.song || 'Unknown Title';
-            const artist = data.artist || data.singer || 'Unknown Artist';
-            const lyrics = data.lyrics || data.lirik;
-
-            let pesan = `🎵 *Lirik Lagu Ditemukan* 🎵\n\n`;
-            pesan += `📌 *Judul:* ${title}\n`;
-            pesan += `👤 *Penyanyi:* ${artist}\n`;
-            pesan += `──────────────────\n\n`;
-            pesan += lyrics;
 
             await loadingMsg.delete(true).catch(() => {});
-            await msg.reply(pesan);
+            await msg.reply(aiData.data);
             await msg.react('✅');
 
         } catch (error) {
-            console.error('Lirik Error:', error);
+            console.error('Lirik AI Error:', error);
             await loadingMsg.delete(true).catch(() => {});
             await msg.react('❌');
-            msg.reply('❌ *Gagal!* Server lirik sedang sibuk.\n\n_Tips: Coba tambahkan nama penyanyinya, contoh: !lirik komang raim laode_');
+            msg.reply('❌ Gagal mencari lirik bahkan dengan AI.\n\n_Saran: Pastikan koneksi bot ke internet lancar._');
         }
     }
 };
