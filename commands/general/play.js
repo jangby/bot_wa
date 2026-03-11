@@ -2,59 +2,91 @@ const { MessageMedia } = require('whatsapp-web.js');
 
 module.exports = {
     name: 'play',
-    description: 'Memutar lagu dengan bantuan AI agar lebih akurat',
+    description: 'Memutar lagu dengan Multi-API Server (Paling Stabil)',
     async execute(client, msg, args) {
         if (args.length === 0) {
-            return msg.reply('⚠️ Judul lagunya apa? \n*Contoh:* !play bahagia lagi');
+            return msg.reply('⚠️ Masukkan judul lagunya!\nContoh: *!play bahagia lagi*');
         }
 
         const userQuery = args.join(' ');
         await msg.react('⏳');
-        const loadingMsg = await msg.reply('AI sedang mencari lagu yang paling pas... 🧠🎵');
+        const loadingMsg = await msg.reply('🔎 Mencari lagu di database server terbaik...');
 
         try {
-            // 1. TANYA AI (Gemini) UNTUK MEMPERBAIKI JUDUL LAGU
-            // Kita minta AI kasih format "Judul - Artis" saja agar pencarian akurat
-            const aiResponse = await fetch(`https://api.siputzx.my.id/api/ai/gemini?prompt=${encodeURIComponent(
-                `Saya ingin mencari lagu dengan kata kunci "${userQuery}". Tolong berikan HANYA Judul Lagu dan Nama Penyanyinya yang paling populer. Contoh: "Sial - Mahalini". Jangan beri teks lain.`
-            )}`);
-            const aiData = await aiResponse.json();
-            
-            // Jika AI gagal respon, pakai input asli user
-            const fixedTitle = (aiData.status && aiData.data) ? aiData.data.replace(/"/g, '') : userQuery;
-            
-            console.log(`AI menyarankan: ${fixedTitle}`);
+            // 1. TANYA AI UNTUK JUDUL YANG LEBIH AKURAT
+            const aiRes = await fetch(`https://api.siputzx.my.id/api/ai/gemini?prompt=${encodeURIComponent(`Cari lagu "${userQuery}". Sebutkan HANYA "Penyanyi - Judul". Contoh: "Tulus - Hati Hati di Jalan". Jangan ada teks tambahan lain!`)}`);
+            const aiData = await aiRes.json();
+            const queryAkurat = (aiData.status && aiData.data) ? aiData.data.trim() : userQuery;
 
-            // 2. CARI LAGU & DOWNLOAD (Gunakan API serbaguna yang lebih stabil)
-            // Kita pakai API Spotify Downloader karena lebih joss
-            const dlUrl = `https://api.siputzx.my.id/api/d/spotify?url=${encodeURIComponent(fixedTitle)}`;
-            const response = await fetch(dlUrl);
-            const resData = await response.json();
+            console.log('Mencari lagu:', queryAkurat);
 
-            if (!resData.status || !resData.data || !resData.data.download) {
-                throw new Error('Lagu tidak ditemukan di server musik.');
+            let audioUrl = null;
+            let finalTitle = queryAkurat;
+
+            // ==========================================
+            // SERVER 1: API AEMT (YTDL PROXY) - SANGAT STABIL
+            // ==========================================
+            try {
+                const res1 = await fetch(`https://api.aemt.me/youtube?url=${encodeURIComponent(queryAkurat)}`);
+                const data1 = await res1.json();
+                if (data1.status && data1.result && data1.result.mp3) {
+                    audioUrl = data1.result.mp3;
+                    finalTitle = data1.result.title || queryAkurat;
+                    console.log('Berhasil menggunakan Server 1');
+                }
+            } catch (e) { console.log('Server 1 Gagal'); }
+
+            // ==========================================
+            // SERVER 2: API DANDY (SPOTIFY DL) - ALTERNATIF
+            // ==========================================
+            if (!audioUrl) {
+                try {
+                    const res2 = await fetch(`https://api.dandymods.xyz/api/spotifydl?url=${encodeURIComponent(queryAkurat)}`);
+                    const data2 = await res2.json();
+                    if (data2.status && data2.result && data2.result.download) {
+                        audioUrl = data2.result.download;
+                        finalTitle = data2.result.title || queryAkurat;
+                        console.log('Berhasil menggunakan Server 2');
+                    }
+                } catch (e) { console.log('Server 2 Gagal'); }
             }
 
-            const { download, title, artist } = resData.data;
+            // ==========================================
+            // SERVER 3: API SIPUTZX (NEW ENDPOINT)
+            // ==========================================
+            if (!audioUrl) {
+                try {
+                    const res3 = await fetch(`https://api.siputzx.my.id/api/d/spotify?url=${encodeURIComponent(queryAkurat)}`);
+                    const data3 = await res3.json();
+                    if (data3.status && data3.data && data3.data.download) {
+                        audioUrl = data3.data.download;
+                        console.log('Berhasil menggunakan Server 3');
+                    }
+                } catch (e) { console.log('Server 3 Gagal'); }
+            }
 
-            // 3. PROSES PENGIRIMAN
-            const media = await MessageMedia.fromUrl(download, { 
+            if (!audioUrl) {
+                throw new Error('Semua server musik sedang sibuk (Overload).');
+            }
+
+            // 2. DOWNLOAD & KIRIM
+            const media = await MessageMedia.fromUrl(audioUrl, { 
                 unsafeMime: true, 
-                filename: `${title}.mp3` 
+                filename: `${finalTitle}.mp3` 
             });
 
             await loadingMsg.delete(true).catch(() => {});
-            await msg.reply(`✅ *AI Menemukan Lagu!*\n\n🎶 *Judul:* ${title}\n👤 *Artis:* ${artist}\n\n_Sabar ya, VN lagi dikirim..._`);
+            await msg.reply(`🎶 *Lagu Ditemukan:* ${finalTitle}\n\n_Sedang mengirim Voice Note..._`);
 
-            // Kirim sebagai VN
+            // Kirim sebagai VN agar keren
             await msg.reply(media, null, { sendAudioAsVoice: true });
             await msg.react('✅');
 
         } catch (error) {
-            console.error('Error Play AI:', error);
+            console.error('Play Error:', error);
             await loadingMsg.delete(true).catch(() => {});
             await msg.react('❌');
-            msg.reply(`❌ Waduh, DJ-nya lagi pusing.\n*Info:* ${error.message}\nCoba ketik judul yang lebih jelas ya.`);
+            msg.reply(`❌ Gagal memutar lagu.\n*Pesan:* ${error.message}\n\n_Saran: Coba lagi dengan judul yang lebih lengkap atau tunggu beberapa saat._`);
         }
     }
 };
