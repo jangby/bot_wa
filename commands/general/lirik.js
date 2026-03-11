@@ -1,43 +1,50 @@
 module.exports = {
     name: 'lirik',
-    description: 'Mencari lirik lagu menggunakan AI (Anti-Limit)',
+    description: 'Mencari lirik lagu menggunakan Qwen2.5 Lokal',
     async execute(client, msg, args) {
         if (args.length === 0) return msg.reply('⚠️ Masukkan judul lagunya!\nContoh: *!lirik Komang*');
 
         const query = args.join(' ');
         await msg.react('🔍');
-        const loadingMsg = await msg.reply(`🔎 AI sedang mengingat lirik *"${query}"*...`);
+        const loadingMsg = await msg.reply(`🔎 Mengambil lirik dari otak Qwen Lokal...`);
 
         try {
-            // Kita gunakan API Gemini untuk mencari lirik
-            // Ini jauh lebih stabil karena database AI sangat besar
-            const aiRes = await fetch(`https://api.siputzx.my.id/api/ai/gemini?prompt=${encodeURIComponent(
-                `Tolong berikan lirik lagu lengkap dari "${query}". 
-                Format jawaban harus rapi: 
-                🎵 *Lirik Lagu ditemukan* 🎵
-                📌 *Judul:* [Judul]
-                👤 *Penyanyi:* [Artis]
-                ──────────────────
-                [Isi Lirik]
-                
-                Jangan berikan teks penjelasan lain, langsung format tersebut.`
-            )}`);
-            
-            const aiData = await aiRes.json();
+            // Memanggil API Ollama di Localhost VPS kamu
+            const response = await fetch('http://localhost:11434/api/generate', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    model: 'qwen2.5:1.5b',
+                    prompt: `Tolong berikan lirik lagu lengkap dari "${query}". 
+                             Format jawaban harus rapi: 
+                             🎵 *Lirik Lagu Ditemukan* 🎵
+                             📌 *Judul:* [Sebutkan Judul]
+                             👤 *Penyanyi:* [Sebutkan Artis]
+                             ──────────────────
+                             [Isi Lirik]
+                             
+                             Jangan berikan teks penjelasan lain di awal atau akhir.`,
+                    stream: false // Kita matikan stream agar hasilnya langsung jadi satu teks
+                }),
+            });
 
-            if (!aiData.status || !aiData.data) {
-                throw new Error('AI tidak bisa menemukan lirik tersebut.');
+            const data = await response.json();
+
+            if (!data.response) {
+                throw new Error('Qwen tidak memberikan jawaban.');
             }
 
             await loadingMsg.delete(true).catch(() => {});
-            await msg.reply(aiData.data);
+            await msg.reply(data.response.trim());
             await msg.react('✅');
 
         } catch (error) {
-            console.error('Lirik AI Error:', error);
+            console.error('Qwen Error:', error);
             await loadingMsg.delete(true).catch(() => {});
             await msg.react('❌');
-            msg.reply('❌ Gagal mencari lirik bahkan dengan AI.\n\n_Saran: Pastikan koneksi bot ke internet lancar._');
+            msg.reply('❌ Gagal memanggil Qwen Lokal. Pastikan Ollama sudah berjalan di VPS (`ollama serve`).');
         }
     }
 };
