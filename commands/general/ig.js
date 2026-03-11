@@ -2,48 +2,68 @@ const { MessageMedia } = require('whatsapp-web.js');
 
 module.exports = {
     name: 'ig',
-    description: 'Download video Instagram (Reels / Post)',
+    description: 'Download video Instagram (Sistem Multi-API)',
     async execute(client, msg, args) {
-        // 1. Cek apakah user memasukkan link
         if (args.length === 0) {
             return msg.reply('⚠️ Mana link Instagram-nya bro?\n\n*Contoh:* !ig https://www.instagram.com/reel/xxxxxx/');
         }
 
-        const url = args[0];
+        // Bersihkan link dari spasi
+        const url = args[0].trim();
 
-        // 2. Validasi link (Pastikan itu benar-benar link Instagram)
         if (!url.includes('instagram.com')) {
-            return msg.reply('❌ Link tidak valid! Pastikan kamu ngirim link dari aplikasi Instagram.');
+            return msg.reply('❌ Link tidak valid! Pastikan itu link dari aplikasi Instagram.');
         }
 
-        // Beri reaksi dan pesan loading
         await msg.react('⏳');
-        const loadingMsg = await msg.reply('Tunggu bentar ya, video IG-nya lagi di-proses... 📥');
+        const loadingMsg = await msg.reply('Tunggu bentar ya, lagi menembus pertahanan Instagram... 🛡️📥');
 
         try {
-            // 3. Kita ganti menggunakan API dari Itzpire (Sangat stabil untuk IG)
-            const apiUrl = `https://itzpire.com/download/instagram?url=${encodeURIComponent(url)}`;
-            const response = await fetch(apiUrl);
-            
-            if (!response.ok) throw new Error('API Sedang Down');
-            
-            const data = await response.json();
+            let videoUrl = null;
 
-            // Cek apakah API berhasil menemukan datanya
-            if (data.status !== "success" || !data.data || !data.data.media) {
-                throw new Error('Data tidak ditemukan dari API');
+            // ========================================================
+            // SISTEM FALLBACK: Coba berbagai API secara berurutan
+            // ========================================================
+
+            // PERCOBAAN 1: Menggunakan API Siputzx (Sangat populer saat ini)
+            try {
+                const res1 = await fetch(`https://api.siputzx.my.id/api/d/igdl?url=${encodeURIComponent(url)}`);
+                const data1 = await res1.json();
+                if (data1.status && data1.data && data1.data.length > 0) {
+                    videoUrl = data1.data[0].url;
+                    console.log('Sukses via API 1 (Siputzx)');
+                }
+            } catch (e) {
+                console.log('API 1 Gagal:', e.message);
             }
 
-            // 4. Ambil URL video
-            // API itzpire menyimpan link videonya di dalam array data.media
-            const videoUrl = data.data.media[0];
+            // PERCOBAAN 2: Jika API 1 gagal/down, otomatis coba API Agatz
+            if (!videoUrl) {
+                try {
+                    const res2 = await fetch(`https://api.agatz.xyz/api/igdl?url=${encodeURIComponent(url)}`);
+                    const data2 = await res2.json();
+                    if (data2.status && data2.data && data2.data[0].url) {
+                        videoUrl = data2.data[0].url;
+                        console.log('Sukses via API 2 (Agatz)');
+                    }
+                } catch (e) {
+                    console.log('API 2 Gagal:', e.message);
+                }
+            }
 
-            if (!videoUrl) throw new Error('Link video kosong');
+            // Jika kedua server API gagal mendapatkan link video
+            if (!videoUrl) {
+                throw new Error('Semua server penyedia layanan down atau video diblokir IG');
+            }
 
-            // 5. Ubah URL video menjadi format Media WhatsApp
+            // ========================================================
+            // PROSES PENGIRIMAN VIDEO
+            // ========================================================
+            
+            // Ubah URL menjadi format Media WhatsApp
             const media = await MessageMedia.fromUrl(videoUrl, { unsafeMime: true });
 
-            // 6. Kirim video ke grup
+            // Kirim video ke grup
             await msg.reply(media, null, { caption: `✅ *Berhasil Download dari Instagram!*` });
             
             // Hapus pesan loading dan beri centang
@@ -54,7 +74,9 @@ module.exports = {
             console.error('Error IG Downloader:', error);
             await loadingMsg.delete(true).catch(() => {});
             await msg.react('❌');
-            msg.reply('❌ Gagal mendownload video. Pastikan linknya valid, tidak ada salah ketik, dan akun IG tersebut **TIDAK DI-PRIVATE**.');
+            
+            // Menampilkan error sebenarnya agar mudah dianalisis
+            msg.reply(`❌ Gagal mendownload video.\n\n*Info Sistem:* ${error.message}\nPastikan akun IG tersebut **TIDAK DI-PRIVATE**.`);
         }
     }
 };
