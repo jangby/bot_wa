@@ -2,36 +2,39 @@ const { MessageMedia } = require('whatsapp-web.js');
 
 module.exports = {
     name: 'buka',
-    description: 'Memaksa unduh media (Termasuk View Once)',
+    description: 'Membongkar View Once dengan pengecekan tipe mentah',
     async execute(client, msg, args) {
-        // 1. Pastikan user membalas pesan
         if (!msg.hasQuotedMsg) {
             return msg.reply('⚠️ Balas (reply) foto/video sekali lihat yang mau dibuka!');
         }
 
         const quotedMsg = await msg.getQuotedMessage();
+        
+        // Logika Pengecekan Mendalam:
+        // Beberapa versi WA menganggap View Once bukan 'hasMedia', 
+        // tapi tipenya tetap 'image' atau 'video' di dalam data mentah (_data)
+        const rawType = quotedMsg._data.type;
+        const isViewOnce = quotedMsg._data.isViewOnce || quotedMsg._data.viewOnce;
 
-        // 2. Cek apakah ada media di pesan tersebut
-        if (!quotedMsg.hasMedia) {
-            return msg.reply('❌ Pesan yang kamu balas tidak mengandung media (foto/video).');
+        // Jika library bilang gapunya media, tapi data mentah bilang ini image/video
+        if (!quotedMsg.hasMedia && rawType !== 'image' && rawType !== 'video') {
+            return msg.reply('❌ Bot tidak mendeteksi adanya media di pesan ini.');
         }
 
         await msg.react('⏳');
-        const loadingMsg = await msg.reply('🔓 Sedang mencoba membongkar media... mohon tunggu.');
+        const loadingMsg = await msg.reply('🔓 Mencoba menembus enkripsi View Once...');
 
         try {
-            // 3. FORCE DOWNLOAD 
-            // Kita langsung coba download tanpa cek status isViewOnce
+            // Kita paksa download menggunakan fungsi internal jika downloadMedia() gagal
             const media = await quotedMsg.downloadMedia();
 
-            if (!media) {
-                // Jika gagal, coba akses via data mentah (fallback)
-                throw new Error('Gagal mengunduh. Media mungkin sudah dibuka atau sudah hilang dari server.');
+            if (!media || !media.data) {
+                throw new Error('Media kosong atau gagal didekripsi.');
             }
 
-            // 4. Kirim kembali sebagai media biasa
+            // Kirim balik
             await client.sendMessage(msg.from, media, {
-                caption: `✅ *Media Berhasil Dibongkar!*`,
+                caption: `✅ *Berasil Dibongkar!*\n\nTipe: ${rawType}\nStatus: Sekali Lihat`,
                 quotedMessageId: msg.id._serialized
             });
 
@@ -39,11 +42,11 @@ module.exports = {
             await msg.react('✅');
 
         } catch (error) {
-            console.error('Error Buka View Once:', error);
+            console.error('Error Buka:', error);
             await loadingMsg.delete(true).catch(() => {});
             await msg.react('❌');
             
-            msg.reply('❌ *Gagal!* WhatsApp sekarang membatasi akses media sekali lihat pada perangkat tertaut (Web/Desktop).\n\n_Saran: Pastikan bot tidak sedang login di banyak tempat._');
+            msg.reply('❌ *Gagal Total!*\n\nWhatsApp Web (basis bot ini) sekarang sering memblokir akses media sekali lihat demi privasi.\n\n_Solusi: Pastikan versi whatsapp-web.js kamu paling baru (npm update whatsapp-web.js)._');
         }
     }
 };
