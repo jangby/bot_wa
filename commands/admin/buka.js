@@ -2,47 +2,44 @@ const { MessageMedia } = require('whatsapp-web.js');
 
 module.exports = {
     name: 'buka',
-    description: 'Buka media sekali lihat (View Once) secara manual',
-    async execute(client, msg, args, { chat, isAdmin, isOwner }) {
-        // 1. Cek Admin/Owner
-        if (!chat.isGroup) return msg.reply('❌ Hanya bisa di grup!');
-        if (!isAdmin && !isOwner) return msg.reply('❌ Fitur ini khusus Admin & Owner!');
-
-        // 2. Cek Reply
+    description: 'Mengubah foto/video sekali lihat (View Once) menjadi pesan biasa',
+    async execute(client, msg, args) {
+        // 1. Cek apakah pesan yang dibalas (quoted) ada
         if (!msg.hasQuotedMsg) {
-            return msg.reply('❌ Caranya: Reply (balas) foto/video sekali lihat, lalu ketik *!buka*');
+            return msg.reply('⚠️ Balas (reply) foto atau video sekali lihat yang mau dibuka!');
         }
 
+        const quotedMsg = await msg.getQuotedMessage();
+
+        // 2. Cek apakah itu benar-benar media sekali lihat
+        // Kita cek properti _data.isViewOnce (properti internal whatsapp-web.js)
+        if (!quotedMsg.hasMedia || !quotedMsg._data.isViewOnce) {
+            return msg.reply('❌ Itu bukan media sekali lihat (View Once).');
+        }
+
+        await msg.react('⏳');
+
         try {
-            const quotedMsg = await msg.getQuotedMessage();
-
-            // Beri reaksi proses (biar user tau bot sedang bekerja)
-            await msg.react('⏳');
-
-            // --- METODE PAKSA (BRUTE FORCE) ---
-            // Kita tidak cek if(hasMedia) lagi, langsung coba download aja.
-            // Kalau gagal download, berarti emang bukan media.
-            
+            // 3. Download media tersebut
+            // Bot akan mencoba mengambil buffer mentah sebelum dihapus server
             const media = await quotedMsg.downloadMedia();
 
-            // Cek apakah hasil download valid?
-            if (!media || !media.data) {
-                await msg.react('❌');
-                return msg.reply('❌ Gagal mengambil media. Pastikan yang direply adalah Foto/Video (bukan stiker/teks) dan belum kadaluarsa.');
+            if (!media) {
+                throw new Error('Gagal mengunduh media. Mungkin sudah kadaluarsa atau sudah dibuka.');
             }
 
-            // Kirim Ulang
-            await client.sendMessage(msg.from, media, { 
-                caption: '🔓 *MEDIA TERBUKA*\n\nBerhasil dibuka oleh Admin.',
-                isViewOnce: false // Pastikan false agar tidak view once lagi
+            // 4. Kirim kembali ke chat tanpa mode View Once
+            await client.sendMessage(msg.from, media, {
+                caption: `✅ *Berhasil Membuka Media Sekali Lihat*\n\n_Media ini sekarang bisa kamu simpan atau lihat berkali-kali._`,
+                quotedMessageId: msg.id._serialized // Agar membalas chat user
             });
 
             await msg.react('✅');
 
         } catch (error) {
-            console.error('Error !buka:', error);
+            console.error('Error Buka View Once:', error);
             await msg.react('❌');
-            msg.reply('❌ Terjadi kesalahan. Bot tidak bisa mendownload media tersebut (Mungkin bug library atau WA memblokir aksesnya).');
+            msg.reply('❌ Gagal membuka media.\n\n*Pesan:* ' + error.message);
         }
     }
 };
