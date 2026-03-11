@@ -13,17 +13,20 @@ Cara pakai: *!hadits [perowi] [nomor]*
 - bukhari
 - muslim
 - nasai
-- abudaud
+- abu daud
 - tirmidzi
-- ibnumajah
+- ibnu majah
 - malik
 - ahmad
 
-Contoh: *!hadits bukhari 1*`);
+Contoh: *!hadits bukhari 1* atau *!hadits ibnu majah 1*`);
         }
 
-        const perowi = args[0].toLowerCase();
-        const nomor = args[1];
+        // PERBAIKAN: Ambil kata paling terakhir sebagai nomor
+        const nomor = args.pop(); 
+        
+        // PERBAIKAN: Gabungkan sisa kata di depannya, lalu hapus spasinya (ibnu majah -> ibnumajah)
+        const perowi = args.join('').toLowerCase();
 
         // 2. Validasi Nama Perowi
         const validPerowi = ['bukhari', 'muslim', 'nasai', 'abudaud', 'tirmidzi', 'ibnumajah', 'malik', 'ahmad', 'darimi'];
@@ -48,8 +51,13 @@ Contoh: *!hadits bukhari 1*`);
             const arab = hadits.arab;
             const terjemahan = hadits.id;
 
+            // Tambahan: Merapikan nama perowi untuk ditampilkan (agar tidak tersambung)
+            let namaTampil = perowi.toUpperCase();
+            if (perowi === 'abudaud') namaTampil = 'ABU DAUD';
+            if (perowi === 'ibnumajah') namaTampil = 'IBNU MAJAH';
+
             // 4. Susun Pesan (Arab di atas, Terjemahan di bawah)
-            const text = `🕌 *HADITS RIWAYAT ${perowi.toUpperCase()}* 🕌
+            const text = `🕌 *HADITS RIWAYAT ${namaTampil}* 🕌
 Nomor: ${nomor}
 
 ${arab}
