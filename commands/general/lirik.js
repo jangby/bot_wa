@@ -13,24 +13,25 @@ module.exports = {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    model: 'qwen2.5:1.5b',
-                    prompt: `Kamu adalah asisten musik yang handal. 
-                             Tuliskan lirik LENGKAP lagu "${query}". 
-                             
-                             WAJIB menggunakan format ini:
-                             🎵 *Lirik Lagu Ditemukan* 🎵
-                             📌 *Judul:* [Judul Lagu]
-                             👤 *Penyanyi:* [Nama Penyanyi]
-                             ──────────────────
-                             [TULIS SELURUH LIRIK DI SINI DARI AWAL SAMPAI HABIS]
-                             
-                             Jangan berhenti sebelum lirik selesai.`,
-                    stream: false,
-                    options: {
-                        num_predict: 1000, // Memaksa AI menulis lebih panjang (biar gak kepotong)
-                        temperature: 0.7   // Biar lebih kreatif tapi tetep akurat
-                    }
-                }),
+    model: 'qwen2.5:1.5b',
+    prompt: `[INST] Kamu adalah DATABASE LIRIK LAGU. Tugasmu hanya satu: menuliskan lirik lagu.
+             Dilarang berkomentar, dilarang meminta maaf, dan dilarang mengaku tidak tahu.
+             
+             Tuliskan lirik lagu: "${query}"
+             
+             Format:
+             🎵 *Lirik Lagu Ditemukan* 🎵
+             📌 *Judul:* [Judul]
+             👤 *Penyanyi:* [Artis]
+             ──────────────────
+             [LIRIK LENGKAP] [/INST]`,
+    stream: false,
+    options: {
+        num_predict: 800,
+        temperature: 0.1, // Turunkan suhu agar AI lebih fokus pada data, bukan ngobrol
+        top_p: 0.9
+    }
+}),
             });
 
             const data = await response.json();
