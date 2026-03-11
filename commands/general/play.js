@@ -2,68 +2,48 @@ const { MessageMedia } = require('whatsapp-web.js');
 
 module.exports = {
     name: 'play',
-    description: 'Memutar lagu dengan API Private (Paling Stabil)',
+    description: 'Play music via High-Speed API',
     async execute(client, msg, args) {
-        if (args.length === 0) {
-            return msg.reply('⚠️ Judul lagunya apa?\nContoh: *!play sial mahalini*');
-        }
+        if (args.length === 0) return msg.reply('⚠️ Masukkan judul lagu!');
 
         const query = args.join(' ');
         await msg.react('⏳');
-        const loadingMsg = await msg.reply('🎧 Sedang menyiapkan musik untukmu...');
+        const loadingMsg = await msg.reply(`🎧 Mencari *"${query}"*...`);
 
         try {
-            // 1. CARI INFO LAGU & VIDEO TERLEBIH DAHULU
-            const searchRes = await fetch(`https://api.siputzx.my.id/api/s/youtube?query=${encodeURIComponent(query)}`);
-            const searchData = await searchRes.json();
+            // Kita gunakan API pengunduh yang langsung mencari & mengonversi
+            // Ini adalah salah satu API paling stabil saat ini (AlyaChan)
+            const apiRes = await fetch(`https://api.alyachan.pro/api/ytmp3?url=${encodeURIComponent(query)}&apikey=GataDios`);
+            const json = await apiRes.json();
 
-            if (!searchData.status || !searchData.data || searchData.data.length === 0) {
-                throw new Error('Lagu tidak ditemukan.');
-            }
-
-            const video = searchData.data[0];
-            const videoUrl = video.url;
-            const videoTitle = video.title;
-
-            // 2. GUNAKAN API DOWNLOADER KHUSUS (API ini menggunakan jalur bypass terbaru)
-            // Kita coba API dari 'Widipe' atau 'Alya' yang sedang stabil-stabilnya
-            const dlRes = await fetch(`https://api.alyachan.pro/api/ytmp3?url=${videoUrl}&apikey=GataDios`);
-            const dlData = await dlRes.json();
-
-            let mp3Url = null;
-            if (dlData.status && dlData.data && dlData.data.url) {
-                mp3Url = dlData.data.url;
+            if (!json.status || !json.data || !json.data.url) {
+                // Jika gagal, coba API Global (Dandymods)
+                const res2 = await fetch(`https://api.dandymods.xyz/api/ytmp3?url=${encodeURIComponent(query)}`);
+                const json2 = await res2.json();
+                
+                if (!json2.status || !json2.result.url) throw new Error('Semua server sedang sibuk.');
+                
+                var downloadUrl = json2.result.url;
+                var title = json2.result.title;
             } else {
-                // FALLBACK ke API cadangan lain
-                const backupRes = await fetch(`https://api.zenkey.my.id/api/download/ytmp3?url=${videoUrl}&apikey=zenkey`);
-                const backupData = await backupRes.json();
-                if (backupData.status && backupData.result && backupData.result.download_url) {
-                    mp3Url = backupData.result.download_url;
-                }
+                var downloadUrl = json.data.url;
+                var title = json.data.title;
             }
 
-            if (!mp3Url) {
-                throw new Error('Server audio sedang penuh. Coba lagi dalam 1 menit.');
-            }
-
-            // 3. UNDUH DAN KIRIM KE WHATSAPP
-            const media = await MessageMedia.fromUrl(mp3Url, { 
+            const media = await MessageMedia.fromUrl(downloadUrl, { 
                 unsafeMime: true, 
-                filename: `${videoTitle}.mp3` 
+                filename: `${title}.mp3` 
             });
 
             await loadingMsg.delete(true).catch(() => {});
-            await msg.reply(`🎶 *Judul:* ${videoTitle}\n\n_Sedang mengirim Voice Note..._`);
-
-            // Kirim sebagai Voice Note
             await msg.reply(media, null, { sendAudioAsVoice: true });
             await msg.react('✅');
 
         } catch (error) {
-            console.error('Play Error:', error);
+            console.error(error);
             await loadingMsg.delete(true).catch(() => {});
             await msg.react('❌');
-            msg.reply(`❌ *Sistem Down!*\n\n*Info:* ${error.message}\n\n_Catatan: Jika terus gagal, YouTube sedang melakukan maintenance besar-besaran pada sistem API mereka. Cobalah beberapa saat lagi._`);
+            msg.reply('❌ Gagal memutar lagu. YouTube sedang memperketat keamanan, coba lagi nanti atau gunakan judul lain.');
         }
     }
 };
