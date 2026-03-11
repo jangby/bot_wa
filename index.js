@@ -19,7 +19,7 @@ const client = new Client({
     puppeteer: { 
         headless: true,
         // ARAHKAN KE GOOGLE CHROME LAPTOP KAMU
-        executablePath: 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe', 
+        executablePath: '/usr/bin/chromium-browser',
         args: [
             '--no-sandbox', 
             '--disable-setuid-sandbox',
