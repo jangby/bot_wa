@@ -2,83 +2,60 @@ const { MessageMedia } = require('whatsapp-web.js');
 
 module.exports = {
     name: 'play',
-    description: 'Memutar lagu dengan Multi-API Server (Paling Stabil)',
+    description: 'Memutar lagu dengan API Private (Paling Stabil)',
     async execute(client, msg, args) {
         if (args.length === 0) {
-            return msg.reply('⚠️ Masukkan judul lagunya!\nContoh: *!play bahagia lagi*');
+            return msg.reply('⚠️ Judul lagunya apa?\nContoh: *!play sial mahalini*');
         }
 
-        const userQuery = args.join(' ');
+        const query = args.join(' ');
         await msg.react('⏳');
-        const loadingMsg = await msg.reply('🔎 Mencari lagu di database server terbaik...');
+        const loadingMsg = await msg.reply('🎧 Sedang menyiapkan musik untukmu...');
 
         try {
-            // 1. TANYA AI UNTUK JUDUL YANG LEBIH AKURAT
-            const aiRes = await fetch(`https://api.siputzx.my.id/api/ai/gemini?prompt=${encodeURIComponent(`Cari lagu "${userQuery}". Sebutkan HANYA "Penyanyi - Judul". Contoh: "Tulus - Hati Hati di Jalan". Jangan ada teks tambahan lain!`)}`);
-            const aiData = await aiRes.json();
-            const queryAkurat = (aiData.status && aiData.data) ? aiData.data.trim() : userQuery;
+            // 1. CARI INFO LAGU & VIDEO TERLEBIH DAHULU
+            const searchRes = await fetch(`https://api.siputzx.my.id/api/s/youtube?query=${encodeURIComponent(query)}`);
+            const searchData = await searchRes.json();
 
-            console.log('Mencari lagu:', queryAkurat);
+            if (!searchData.status || !searchData.data || searchData.data.length === 0) {
+                throw new Error('Lagu tidak ditemukan.');
+            }
 
-            let audioUrl = null;
-            let finalTitle = queryAkurat;
+            const video = searchData.data[0];
+            const videoUrl = video.url;
+            const videoTitle = video.title;
 
-            // ==========================================
-            // SERVER 1: API AEMT (YTDL PROXY) - SANGAT STABIL
-            // ==========================================
-            try {
-                const res1 = await fetch(`https://api.aemt.me/youtube?url=${encodeURIComponent(queryAkurat)}`);
-                const data1 = await res1.json();
-                if (data1.status && data1.result && data1.result.mp3) {
-                    audioUrl = data1.result.mp3;
-                    finalTitle = data1.result.title || queryAkurat;
-                    console.log('Berhasil menggunakan Server 1');
+            // 2. GUNAKAN API DOWNLOADER KHUSUS (API ini menggunakan jalur bypass terbaru)
+            // Kita coba API dari 'Widipe' atau 'Alya' yang sedang stabil-stabilnya
+            const dlRes = await fetch(`https://api.alyachan.pro/api/ytmp3?url=${videoUrl}&apikey=GataDios`);
+            const dlData = await dlRes.json();
+
+            let mp3Url = null;
+            if (dlData.status && dlData.data && dlData.data.url) {
+                mp3Url = dlData.data.url;
+            } else {
+                // FALLBACK ke API cadangan lain
+                const backupRes = await fetch(`https://api.zenkey.my.id/api/download/ytmp3?url=${videoUrl}&apikey=zenkey`);
+                const backupData = await backupRes.json();
+                if (backupData.status && backupData.result && backupData.result.download_url) {
+                    mp3Url = backupData.result.download_url;
                 }
-            } catch (e) { console.log('Server 1 Gagal'); }
-
-            // ==========================================
-            // SERVER 2: API DANDY (SPOTIFY DL) - ALTERNATIF
-            // ==========================================
-            if (!audioUrl) {
-                try {
-                    const res2 = await fetch(`https://api.dandymods.xyz/api/spotifydl?url=${encodeURIComponent(queryAkurat)}`);
-                    const data2 = await res2.json();
-                    if (data2.status && data2.result && data2.result.download) {
-                        audioUrl = data2.result.download;
-                        finalTitle = data2.result.title || queryAkurat;
-                        console.log('Berhasil menggunakan Server 2');
-                    }
-                } catch (e) { console.log('Server 2 Gagal'); }
             }
 
-            // ==========================================
-            // SERVER 3: API SIPUTZX (NEW ENDPOINT)
-            // ==========================================
-            if (!audioUrl) {
-                try {
-                    const res3 = await fetch(`https://api.siputzx.my.id/api/d/spotify?url=${encodeURIComponent(queryAkurat)}`);
-                    const data3 = await res3.json();
-                    if (data3.status && data3.data && data3.data.download) {
-                        audioUrl = data3.data.download;
-                        console.log('Berhasil menggunakan Server 3');
-                    }
-                } catch (e) { console.log('Server 3 Gagal'); }
+            if (!mp3Url) {
+                throw new Error('Server audio sedang penuh. Coba lagi dalam 1 menit.');
             }
 
-            if (!audioUrl) {
-                throw new Error('Semua server musik sedang sibuk (Overload).');
-            }
-
-            // 2. DOWNLOAD & KIRIM
-            const media = await MessageMedia.fromUrl(audioUrl, { 
+            // 3. UNDUH DAN KIRIM KE WHATSAPP
+            const media = await MessageMedia.fromUrl(mp3Url, { 
                 unsafeMime: true, 
-                filename: `${finalTitle}.mp3` 
+                filename: `${videoTitle}.mp3` 
             });
 
             await loadingMsg.delete(true).catch(() => {});
-            await msg.reply(`🎶 *Lagu Ditemukan:* ${finalTitle}\n\n_Sedang mengirim Voice Note..._`);
+            await msg.reply(`🎶 *Judul:* ${videoTitle}\n\n_Sedang mengirim Voice Note..._`);
 
-            // Kirim sebagai VN agar keren
+            // Kirim sebagai Voice Note
             await msg.reply(media, null, { sendAudioAsVoice: true });
             await msg.react('✅');
 
@@ -86,7 +63,7 @@ module.exports = {
             console.error('Play Error:', error);
             await loadingMsg.delete(true).catch(() => {});
             await msg.react('❌');
-            msg.reply(`❌ Gagal memutar lagu.\n*Pesan:* ${error.message}\n\n_Saran: Coba lagi dengan judul yang lebih lengkap atau tunggu beberapa saat._`);
+            msg.reply(`❌ *Sistem Down!*\n\n*Info:* ${error.message}\n\n_Catatan: Jika terus gagal, YouTube sedang melakukan maintenance besar-besaran pada sistem API mereka. Cobalah beberapa saat lagi._`);
         }
     }
 };
