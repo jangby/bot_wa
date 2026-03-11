@@ -2,49 +2,52 @@ module.exports = {
     name: 'lirik',
     description: 'Mencari lirik lagu menggunakan Qwen2.5 Lokal',
     async execute(client, msg, args) {
-        if (args.length === 0) return msg.reply('⚠️ Masukkan judul lagunya!\nContoh: *!lirik Komang*');
+        if (args.length === 0) return msg.reply('⚠️ Masukkan judul lagunya!');
 
         const query = args.join(' ');
         await msg.react('🔍');
-        const loadingMsg = await msg.reply(`🔎 Mengambil lirik dari otak Qwen Lokal...`);
+        const loadingMsg = await msg.reply(`🔎 Qwen sedang menuliskan lirik untukmu...`);
 
         try {
-            // Memanggil API Ollama di Localhost VPS kamu
             const response = await fetch('http://localhost:11434/api/generate', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     model: 'qwen2.5:1.5b',
-                    prompt: `Tolong berikan lirik lagu lengkap dari "${query}". 
-                             Format jawaban harus rapi: 
-                             🎵 *Lirik Lagu Ditemukan* 🎵
-                             📌 *Judul:* [Sebutkan Judul]
-                             👤 *Penyanyi:* [Sebutkan Artis]
-                             ──────────────────
-                             [Isi Lirik]
+                    prompt: `Kamu adalah asisten musik yang handal. 
+                             Tuliskan lirik LENGKAP lagu "${query}". 
                              
-                             Jangan berikan teks penjelasan lain di awal atau akhir.`,
-                    stream: false // Kita matikan stream agar hasilnya langsung jadi satu teks
+                             WAJIB menggunakan format ini:
+                             🎵 *Lirik Lagu Ditemukan* 🎵
+                             📌 *Judul:* [Judul Lagu]
+                             👤 *Penyanyi:* [Nama Penyanyi]
+                             ──────────────────
+                             [TULIS SELURUH LIRIK DI SINI DARI AWAL SAMPAI HABIS]
+                             
+                             Jangan berhenti sebelum lirik selesai.`,
+                    stream: false,
+                    options: {
+                        num_predict: 1000, // Memaksa AI menulis lebih panjang (biar gak kepotong)
+                        temperature: 0.7   // Biar lebih kreatif tapi tetep akurat
+                    }
                 }),
             });
 
             const data = await response.json();
+            const result = data.response.trim();
 
-            if (!data.response) {
-                throw new Error('Qwen tidak memberikan jawaban.');
+            if (!result || result.length < 50) {
+                throw new Error('Hasil terlalu pendek, sepertinya Qwen lagi malas.');
             }
 
             await loadingMsg.delete(true).catch(() => {});
-            await msg.reply(data.response.trim());
+            await msg.reply(result);
             await msg.react('✅');
 
         } catch (error) {
-            console.error('Qwen Error:', error);
+            console.error('Qwen Lirik Error:', error);
             await loadingMsg.delete(true).catch(() => {});
-            await msg.react('❌');
-            msg.reply('❌ Gagal memanggil Qwen Lokal. Pastikan Ollama sudah berjalan di VPS (`ollama serve`).');
+            msg.reply('❌ Qwen gagal memberikan lirik lengkap. Coba sekali lagi atau gunakan judul + artis yang jelas.');
         }
     }
 };
