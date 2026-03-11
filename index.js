@@ -259,6 +259,43 @@ client.on('message_create', async (msg) => {
         }
 
         // ==========================================
+        // 🤖 7.5 AUTO-BALAS AI HANDLER
+        // ==========================================
+        const autoBalasPath = path.join(__dirname, './data/autobalas.json');
+        if (fs.existsSync(autoBalasPath) && !body.startsWith('!')) {
+            const autoBalasUsers = JSON.parse(fs.readFileSync(autoBalasPath));
+            
+            // Jika pengirim ada di daftar auto-balas DAN pesannya bukan dari bot sendiri
+            if (autoBalasUsers.includes(senderId) && !msg.fromMe) {
+                try {
+                    // Beri status "typing..." agar terlihat seperti manusia betulan
+                    await chat.sendStateTyping();
+
+                    // Instruksi untuk Ollama agar menjadi gaul dan friendly
+                    const promptAI = `Kamu adalah teman ngobrol santai dari Indonesia. Bersikaplah sangat friendly, gaul, dan asik. Gunakan bahasa tongkrongan (seperti lo, gue, bro, sis, anjir, dll) tapi jangan kasar. Sesuaikan gaya bahasamu dengan chat lawan bicaramu. Balaslah chat berikut dengan natural dan seolah kamu manusia betulan:\n\n"${body}"`;
+
+                    const response = await fetch('http://localhost:11434/api/generate', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            model: 'llama3', // Sesuaikan dengan modelmu
+                            prompt: promptAI,
+                            stream: false
+                        })
+                    });
+
+                    if (response.ok) {
+                        const data = await response.json();
+                        await msg.reply(data.response);
+                    }
+                    return; // ⛔ PENTING: Stop di sini agar chat biasa tidak error saat masuk ke Command Handler bawahnya
+                } catch (error) {
+                    console.error('Auto-Balas Error:', error);
+                }
+            }
+        }
+
+        // ==========================================
         // ⚙️ 8. COMMAND HANDLER (Prefix !)
         // ==========================================
         if (!body.startsWith('!')) return; // Hanya respon yg depannya !
