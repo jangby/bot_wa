@@ -9,69 +9,67 @@ module.exports = {
             return msg.reply(`❌ *Format Salah!*
 Cara pakai: *!hadits [perowi] [nomor]*
 
-📚 *Daftar Perowi Tersedia:*
-- bukhari
-- muslim
-- nasai
-- abu daud
-- tirmidzi
-- ibnu majah
-- malik
-- ahmad
+📚 *Daftar Perowi:* bukhari, muslim, nasai, abudaud, tirmidzi, ibnumajah, malik, ahmad, darimi
 
 Contoh: *!hadits bukhari 1* atau *!hadits ibnu majah 1*`);
         }
 
-        // PERBAIKAN: Ambil kata paling terakhir sebagai nomor
+        // Ambil nomor (elemen terakhir)
         const nomor = args.pop(); 
         
-        // PERBAIKAN: Gabungkan sisa kata di depannya, lalu hapus spasinya (ibnu majah -> ibnumajah)
-        const perowi = args.join('').toLowerCase();
+        // Gabungkan sisa kata (misal "ibnu", "majah") menjadi "ibnumajah"
+        const inputPerowi = args.join('').toLowerCase();
 
-        // 2. Validasi Nama Perowi
-        const validPerowi = ['bukhari', 'muslim', 'nasai', 'abudaud', 'tirmidzi', 'ibnumajah', 'malik', 'ahmad', 'darimi'];
-        if (!validPerowi.includes(perowi)) {
-            return msg.reply('❌ Nama perowi salah! Cek daftar dengan ketik *!hadits* saja.');
+        // 2. Mapping ke format API Gading
+        const daftarPerowi = {
+            'bukhari': { api: 'bukhari', tampil: 'BUKHARI' },
+            'muslim': { api: 'muslim', tampil: 'MUSLIM' },
+            'nasai': { api: 'nasai', tampil: "NASA'I" },
+            'abudaud': { api: 'abu-daud', tampil: 'ABU DAUD' },
+            'tirmidzi': { api: 'tirmidzi', tampil: 'TIRMIDZI' },
+            'ibnumajah': { api: 'ibnu-majah', tampil: 'IBNU MAJAH' },
+            'malik': { api: 'malik', tampil: 'MALIK' },
+            'ahmad': { api: 'ahmad', tampil: 'AHMAD' },
+            'darimi': { api: 'darimi', tampil: 'DARIMI' }
+        };
+
+        const perowi = daftarPerowi[inputPerowi];
+
+        if (!perowi) {
+            return msg.reply('❌ Nama perowi salah! Gunakan: *bukhari, muslim, nasai, abudaud, tirmidzi, ibnumajah, malik, ahmad,* atau *darimi*.');
         }
 
         try {
-            await msg.react('🔍'); // Reaksi loading
+            await msg.react('🔍');
 
-            // 3. Ambil Data dari API
-            // API by gading.dev (Gratis & Lengkap)
-            const response = await axios.get(`https://api.hadith.gading.dev/books/${perowi}/${nomor}`);
-            const data = response.data;
+            // 3. Request ke API
+            const response = await axios.get(`https://api.hadith.gading.dev/books/${perowi.api}/${nomor}`);
+            const resData = response.data;
 
-            // Cek jika data kosong / error dari API
-            if (!data.data || !data.data.contents) {
-                return msg.reply(`❌ Maaf, Hadits riwayat *${perowi}* nomor *${nomor}* tidak ditemukan.`);
+            // Validasi data (API Gading biasanya mengembalikan data di dalam objek 'data')
+            if (!resData || resData.code !== 200 || !resData.data.contents) {
+                return msg.reply(`❌ Hadits *${perowi.tampil}* nomor *${nomor}* tidak ditemukan.`);
             }
 
-            const hadits = data.data.contents;
+            const hadits = resData.data.contents;
             const arab = hadits.arab;
             const terjemahan = hadits.id;
 
-            // Tambahan: Merapikan nama perowi untuk ditampilkan (agar tidak tersambung)
-            let namaTampil = perowi.toUpperCase();
-            if (perowi === 'abudaud') namaTampil = 'ABU DAUD';
-            if (perowi === 'ibnumajah') namaTampil = 'IBNU MAJAH';
-
-            // 4. Susun Pesan (Arab di atas, Terjemahan di bawah)
-            const text = `🕌 *HADITS RIWAYAT ${namaTampil}* 🕌
-Nomor: ${nomor}
-
-${arab}
-
-💡 *Artinya:*
-"${terjemahan}"`;
+            // 4. Susun Pesan
+            const text = `🕌 *HADITS RIWAYAT ${perowi.tampil}* 🕌\nNomor: ${nomor}\n\n${arab}\n\n💡 *Artinya:*\n"${terjemahan}"`;
 
             await msg.reply(text);
             await msg.react('✅');
 
         } catch (error) {
-            console.error('Error Hadits:', error);
+            console.error('Error Hadits:', error.message);
             await msg.react('❌');
-            msg.reply('❌ Terjadi kesalahan. Pastikan nomor hadits valid (tidak melebihi jumlah hadits yang ada).');
+            
+            if (error.response && error.response.status === 404) {
+                msg.reply(`❌ Hadits *${perowi.tampil}* nomor *${nomor}* tidak ditemukan.`);
+            } else {
+                msg.reply(`❌ Terjadi kesalahan saat mengambil data. Silakan coba lagi nanti.`);
+            }
         }
     }
 };
