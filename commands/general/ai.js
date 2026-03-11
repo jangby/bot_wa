@@ -22,7 +22,7 @@ module.exports = {
                     'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({
-                    model: 'llama3', // Pastikan nama model sesuai dengan yang kamu unduh (llama3)
+                    model: 'qwen2.5:1.5b', // Pastikan nama model sesuai dengan yang kamu unduh (llama3)
                     prompt: pertanyaan,
                     stream: false // Kita set false agar jawaban dikumpulkan utuh dulu, baru dikirim ke WA
                 })

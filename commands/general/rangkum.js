@@ -41,7 +41,7 @@ module.exports = {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    model: 'llama3', 
+                    model: 'qwen2.5:1.5b', 
                     prompt: promptAI,
                     stream: false
                 })

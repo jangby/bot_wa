@@ -278,7 +278,7 @@ client.on('message_create', async (msg) => {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
-                            model: 'llama3', // Sesuaikan dengan modelmu
+                            model: 'qwen2.5:1.5b', // Sesuaikan dengan modelmu
                             prompt: promptAI,
                             stream: false
                         })
