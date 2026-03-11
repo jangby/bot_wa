@@ -1,4 +1,5 @@
 const config = require('../../config.js'); 
+const uang = require('../../utils/uang.js'); // Tambahkan baris ini untuk memanggil database uang
 
 module.exports = {
     name: 'addsaldo',
@@ -12,12 +13,10 @@ module.exports = {
         const senderNumber = sender.split('@')[0];
 
         // 2. Cek apakah nomor tersebut ada di daftar sudoUsers atau ownerNumber
-        // Kita gunakan .some() untuk mencocokkan apakah ada nomor di config yang mengandung senderNumber
         const isOwner = config.sudoUsers.some(user => user.includes(senderNumber)) || 
                         config.ownerNumber.includes(senderNumber);
 
         if (!isOwner) {
-            // Jika masih gagal, kita print ke terminal VPS untuk cek ID aslinya
             console.log("ID Pengirim (Gagal Owner):", sender);
             return msg.reply('❌ Fitur ini khusus untuk Owner/Sudo Bot!');
         }
@@ -35,12 +34,9 @@ module.exports = {
         }
 
         try {
-            // 4. Update Database
-            // Pastikan objek 'db' sudah di-require atau tersedia secara global
-            let saldoSekarang = await db.getSaldo(target) || 0;
-            let saldoBaru = saldoSekarang + nominal;
-
-            await db.setSaldo(target, saldoBaru);
+            // 4. Update Database menggunakan fungsi dari utils/uang.js
+            // uang.addSaldo akan otomatis menjumlahkan saldo dan mencatat mutasi
+            const saldoBaru = uang.addSaldo(target, nominal, 'Topup via Owner Command');
 
             await msg.reply(`✅ *BERHASIL TAMBAH SALDO*\n\nTarget: @${target.split('@')[0]}\nNominal: +Rp${nominal.toLocaleString('id-ID')}\nTotal Saldo: Rp${saldoBaru.toLocaleString('id-ID')}`, {
                 mentions: [target]
