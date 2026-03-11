@@ -296,6 +296,55 @@ client.on('message_create', async (msg) => {
         }
 
         // ==========================================
+        // 🤖 7.6 AUTO-BALAS JIKA BOT DI-TAG (MENTION)
+        // ==========================================
+        if (chat.isGroup && !msg.fromMe && !body.startsWith('!')) {
+            const botId = client.info.wid._serialized;
+            const mentions = await msg.getMentions();
+            
+            // Cek apakah di antara orang yang di-tag, ada ID bot kita
+            const isBotMentioned = mentions.some(m => m.id._serialized === botId);
+
+            if (isBotMentioned) {
+                try {
+                    // Biar kelihatan seperti manusia ngetik
+                    await chat.sendStateTyping();
+
+                    // Bersihkan teks dari tag bot agar AI fokus pada pertanyaannya
+                    // Contoh: "@628... halo bot" -> "halo bot"
+                    const botNumber = client.info.wid.user; 
+                    const cleanMessage = body.replace(new RegExp(`@${botNumber}`, 'g'), '').trim();
+
+                    // Coba ambil nama pengirim
+                    let senderName = "Member";
+                    try { senderName = contact.pushname || contact.name || "Member"; } catch (e) {}
+
+                    // Instruksi untuk Qwen
+                    const promptAI = `Kamu adalah asisten virtual grup WhatsApp yang asik, ramah, dan gaul. Seseorang bernama ${senderName} baru saja me-mention/memanggilmu di grup dengan pesan berikut:\n\n"${cleanMessage}"\n\nBalaslah pesannya dengan natural. Gunakan bahasa Indonesia yang santai (lo-gue, bro, sis) tapi sopan. Jangan terlalu panjang:`;
+
+                    const response = await fetch('http://localhost:11434/api/generate', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            model: 'qwen2.5:1.5b', // Kita pakai Qwen biar cepat dan pintar bahasa lokal
+                            prompt: promptAI,
+                            stream: false
+                        })
+                    });
+
+                    if (response.ok) {
+                        const data = await response.json();
+                        // Balas pesan dan mention balik orang yang manggil
+                        await msg.reply(data.response, chat.id._serialized, { mentions: [contact] });
+                    }
+                    return; // ⛔ STOP di sini agar tidak tabrakan dengan proses lain
+                } catch (error) {
+                    console.error('Error saat merespon mention:', error);
+                }
+            }
+        }
+
+        // ==========================================
         // ⚙️ 8. COMMAND HANDLER (Prefix !)
         // ==========================================
         if (!body.startsWith('!')) return; // Hanya respon yg depannya !
