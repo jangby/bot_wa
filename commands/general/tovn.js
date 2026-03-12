@@ -2,43 +2,52 @@ const { MessageMedia } = require('whatsapp-web.js');
 
 module.exports = {
     name: 'tovn',
-    description: 'Ubah Video atau Audio biasa menjadi Voice Note (VN)',
+    description: 'Ubah Video atau Audio yang di-reply menjadi Voice Note (VN)',
     async execute(client, msg, args) {
         try {
-            let targetMsg = msg;
-
-            // Cek apakah user me-reply pesan (misalnya me-reply video/mp3)
-            if (msg.hasQuotedMsg) {
-                targetMsg = await msg.getQuotedMessage();
+            // 1. Cek apakah user me-reply sebuah pesan
+            if (!msg.hasQuotedMsg) {
+                return msg.reply('❌ Kamu harus *me-reply (membalas)* pesan audio atau video dengan mengetik *!tovn*');
             }
 
-            // Pastikan pesan tersebut benar-benar memiliki media
-            if (!targetMsg.hasMedia) {
-                return msg.reply('❌ Kirim Video/Audio dengan caption *!tovn*, atau reply Video/Audio yang sudah ada dengan ketik *!tovn*');
-            }
-
-            // Berikan reaksi atau pesan proses agar user tahu bot sedang bekerja
+            // Beri reaksi jam pasir tanda bot sedang memproses
             await msg.react('⏳');
 
-            // Download media dari pesan Whatsapp
-            const media = await targetMsg.downloadMedia();
+            // 2. Ambil pesan yang di-reply
+            const quotedMsg = await msg.getQuotedMessage();
 
-            // Cek apakah medianya valid dan berupa audio/video
-            if (!media || (!media.mimetype.includes('audio') && !media.mimetype.includes('video'))) {
-                return msg.reply('❌ Format tidak didukung! Hanya bisa mengubah Video atau Audio (MP3/MP4).');
+            // 3. Pastikan pesan yang di-reply ada file medianya
+            if (!quotedMsg.hasMedia) {
+                await msg.react('❌');
+                return msg.reply('❌ Pesan yang kamu reply tidak mengandung audio atau video.');
             }
 
-            // Kirim ulang media tersebut ke chat sebagai Voice Note
-            // Parameter `sendAudioAsVoice: true` yang akan mengubahnya jadi VN
+            // 4. Download media dari pesan yang di-reply
+            const media = await quotedMsg.downloadMedia();
+
+            if (!media) {
+                await msg.react('❌');
+                return msg.reply('❌ Gagal mengunduh media dari pesan tersebut. Coba lagi.');
+            }
+
+            // 5. Pastikan formatnya adalah audio atau video
+            if (!media.mimetype.includes('audio') && !media.mimetype.includes('video')) {
+                await msg.react('❌');
+                return msg.reply('❌ Format tidak didukung! Yang di-reply harus berupa Audio atau Video.');
+            }
+
+            // 6. Kirim kembali sebagai Voice Note
             await client.sendMessage(msg.from, media, { 
                 sendAudioAsVoice: true 
             });
 
+            // Beri reaksi centang kalau sukses
             await msg.react('✅');
 
         } catch (error) {
             console.error('Error command tovn:', error);
-            msg.reply('❌ Gagal mengubah ke VN. Pastikan durasi tidak terlalu panjang atau ukuran file tidak terlalu besar.');
+            await msg.react('❌');
+            msg.reply('❌ Terjadi kesalahan sistem. Cek terminal/console untuk melihat detail errornya.');
         }
     }
 };
