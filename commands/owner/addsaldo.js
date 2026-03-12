@@ -1,25 +1,34 @@
 const config = require('../../config.js'); 
-const uang = require('../../utils/uang.js'); // Menggunakan utils uang yang benar
+const uang = require('../../utils/uang.js'); 
 
 module.exports = {
     name: 'addsaldo',
     description: 'Owner menambahkan saldo ke user tertentu',
-    async execute(client, msg, args) { 
+    // Tangkap contact dan isOwner bawaan dari index.js
+    async execute(client, msg, args, { contact, isOwner: isOwnerGlobal }) { 
         
         // 1. Ambil ID pengirim
         const senderRaw = msg.author || msg.from;
         
-        // 🔥 PERBAIKAN BUG WHATSAPP MULTI-DEVICE
-        // Jika ID berupa "62851...:2@c.us", kita buang ":2" dan "@c.us" agar murni jadi "62851..."
+        // Bersihkan ID
         const senderNumber = senderRaw.split('@')[0].split(':')[0];
 
-        // 2. Cocokkan dengan config.js (menggunakan nomor murni)
-        const isOwner = config.ownerNumber.includes(senderNumber) || 
-                        config.sudoUsers.some(user => user.includes(senderNumber));
+        // Cocokkan dengan config.js
+        const isOwnerLocal = config.ownerNumber.includes(senderNumber) || 
+                             config.sudoUsers.some(user => user.includes(senderNumber));
 
-        if (!isOwner) {
-            console.log(`[Akses Ditolak] Nomor terbaca: ${senderNumber}`);
-            return msg.reply('❌ Fitur ini khusus untuk Owner/Sudo Bot!');
+        // 🔥 LOGGING DEBUGGING UNTUK MELIHAT MASALAH ASLINYA 🔥
+        console.log('\n--- 🐞 DEBUGGING FITUR ADDSALDO 🐞 ---');
+        console.log('1. msg.author (Pengirim Mentah) :', msg.author);
+        console.log('2. msg.from (Sumber Chat)       :', msg.from);
+        console.log('3. contact ID (Dari index.js)   :', contact ? contact.id._serialized : 'Tidak terbaca');
+        console.log('4. Nomor Bersih (Telah difilter):', senderNumber);
+        console.log('5. Status Owner (Dari index.js) :', isOwnerGlobal);
+        console.log('6. Status Owner (Filter Lokal)  :', isOwnerLocal);
+        console.log('--------------------------------------\n');
+
+        if (!isOwnerLocal && !isOwnerGlobal) {
+            return msg.reply('❌ Fitur ini khusus untuk Owner/Sudo Bot!\n\n*(Log detail sudah dicetak ke terminal)*');
         }
 
         // 3. Ambil data Mention dan Nominal
