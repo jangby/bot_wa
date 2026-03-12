@@ -1,23 +1,24 @@
 const config = require('../../config.js'); 
-const uang = require('../../utils/uang.js'); // Tambahkan baris ini untuk memanggil database uang
+const uang = require('../../utils/uang.js'); // Menggunakan utils uang yang benar
 
 module.exports = {
     name: 'addsaldo',
     description: 'Owner menambahkan saldo ke user tertentu',
-    async execute(client, msg, args) {
+    async execute(client, msg, args) { 
         
-        // 1. Ambil ID pengirim (Bisa dari author/from)
-        const sender = msg.author || msg.from;
+        // 1. Ambil ID pengirim
+        const senderRaw = msg.author || msg.from;
         
-        // Ambil angkanya saja (Misal: 6285136468097)
-        const senderNumber = sender.split('@')[0];
+        // 🔥 PERBAIKAN BUG WHATSAPP MULTI-DEVICE
+        // Jika ID berupa "62851...:2@c.us", kita buang ":2" dan "@c.us" agar murni jadi "62851..."
+        const senderNumber = senderRaw.split('@')[0].split(':')[0];
 
-        // 2. Cek apakah nomor tersebut ada di daftar sudoUsers atau ownerNumber
-        const isOwner = config.sudoUsers.some(user => user.includes(senderNumber)) || 
-                        config.ownerNumber.includes(senderNumber);
+        // 2. Cocokkan dengan config.js (menggunakan nomor murni)
+        const isOwner = config.ownerNumber.includes(senderNumber) || 
+                        config.sudoUsers.some(user => user.includes(senderNumber));
 
         if (!isOwner) {
-            console.log("ID Pengirim (Gagal Owner):", sender);
+            console.log(`[Akses Ditolak] Nomor terbaca: ${senderNumber}`);
             return msg.reply('❌ Fitur ini khusus untuk Owner/Sudo Bot!');
         }
 
@@ -25,7 +26,6 @@ module.exports = {
         const mentions = await msg.getMentions();
         const target = mentions[0] ? mentions[0].id._serialized : null;
         
-        // Mencari angka nominal di argumen
         const nominalStr = args.find(arg => !isNaN(arg) && !arg.includes('@'));
         const nominal = parseInt(nominalStr);
 
@@ -34,11 +34,13 @@ module.exports = {
         }
 
         try {
-            // 4. Update Database menggunakan fungsi dari utils/uang.js
-            // uang.addSaldo akan otomatis menjumlahkan saldo dan mencatat mutasi
+            // 4. Update Database
             const saldoBaru = uang.addSaldo(target, nominal, 'Topup via Owner Command');
 
-            await msg.reply(`✅ *BERHASIL TAMBAH SALDO*\n\nTarget: @${target.split('@')[0]}\nNominal: +Rp${nominal.toLocaleString('id-ID')}\nTotal Saldo: Rp${saldoBaru.toLocaleString('id-ID')}`, {
+            // Membersihkan target ID saat disebut di pesan balasan
+            const cleanTarget = target.split('@')[0].split(':')[0];
+
+            await msg.reply(`✅ *BERHASIL TAMBAH SALDO*\n\nTarget: @${cleanTarget}\nNominal: +Rp${nominal.toLocaleString('id-ID')}\nTotal Saldo: Rp${saldoBaru.toLocaleString('id-ID')}`, {
                 mentions: [target]
             });
             
