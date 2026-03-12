@@ -1,0 +1,13 @@
+{
+  "type": "service_account",
+  "project_id": "bot-wa-kalender",
+  "private_key_id": "ca114eca03113175df1a45b9316ddc2f5469d0a3",
+  "private_key": "-----BEGIN PRIVATE KEY-----\nMIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQC+Y9Xj/spfyWmS\nCt9Mrslo+yPe7OyQpcr34SbQiag5criIuMthtpRfU4iYTxj4MnlxHRY/6lVfIHoA\nx2obDCuq0dg7rmrDNrwNtiukPaNrLMJBumVhmp6+EToPrrUtp1HWq7KqHS3+Ub5R\nOsyhmG4p1PJDI/8JTwhVrtSdEssPXhwtPwBA0bbfShta2kM/NDXW3OLqwiieqPp6\nmmgA728yWx3F5gWuXpiFKWQgY8GZ3mKcXCh8guDclpcrhRs+jZ1ZJdlYIVofHs7P\npHDXFIVECOfjmhgypBDyPcEJ0PhMcONnc3XR5q76qAjZv+deq1z0K6EluRR1FjHV\ndpzEjPt/AgMBAAECggEAFQ60uv1Uw8himUkDjpcsZqSUQJVCyvLTYpwv71OyW/xA\nxbpuoDWR7oMuMe5ZrCXlAao+aj5QR++vHsPvi+NKNx/zgxJU85drsDaMWCOLHhD6\nwUtM6EEyOoJsQgzINC7z4cLmxWLp0d2Xp6NRu7PAx3aqftuN2yk3Gkb2dBL+i4nj\nfWWHtVHWEOfYp6R8BzP6ga09x9IBoTV+7heIAtddf/75gqIisMA7baj4hqQQdjKn\nvxmwtjeoPQt33/lxYjz0RwC3R9dWZ9PKosr0F2167EUjEJSfPiSWdLDoFGNljH0t\nyNLosgXBwNPcNiPFSjN5nXoFalEt12wb63oNSw4SfQKBgQD3HLrWS3HhhvZph7mL\nJJhEd+om/BL6C6sjVS3s8FztErbuvK9y8G1//u05DcRGJoy4RUb0ON01p8yVag5g\nMqgXD7Szvw6Z1ldwSdM+VTmjJt7Oql25W9MIZGRsQY63GpPTsqISIzqHvM5bQ+6Y\nWn8nNiNVXSzkX4mkemzeZ74C7QKBgQDFPNbWvN1SLzPfDKM/Ro/NyGpkTp1Uo5Yg\nDm7ugUZ5mWrhcHWNAcEgyuDiGj+XV5csKKj2UgImTHrc4thsngLtC4xLz0OWMo6Y\n72VpcrOCZO2EVZbcS7TPpcOMXKEMqe98zW1wk1+lQINFpTd8MEZsEAR8TELu9HDD\nQ9XaOXFOmwKBgAXg2hT08H2T71KtVt2XfkPKsnhA8Naf5m9NvGzxftRo6I8fT/El\nBQXRc6UyzaN5kUlk5H40yBZZqoU3Y6YoLlV2Gy9XcSp5rdTO/MZz0o4uA4jZBqe9\nJnUBpl3o5VM3v6J+klpqGh9Wf3YuVIOtS28MW6TRNZstJqISA3r67ss1AoGBAKKf\nJffJoqWHW7pVPigGsryVuPrZQqktc7Mck2Q83HGYB+K2iYVoY+b4v3BM+g97XZ5A\nLAdj2HfhaQ/ETXNI2Nq/Qb6jtnMZXi9EexX1R4KEWr1YoFkkZoEqiE+rc/HwDxCU\ng95k9GBZD6MVtOjFGNsyXbBqZGmGy46D2MfjwsNvAoGBAIvyFksSdvBMJCkNiefR\ncEHKxsVtWQDYSIcLFFKsnf2XRa2DYYKTR/KoLobTTp8NVfpr8hKPySiwPNtRWDVy\nD6URQws8KcsvisS6Z22YytFJxDgPKhRMI5/ZL3hf6AoIitsYxGleV+rZwaQ0M57w\nUP50zCM8zkOnGVzdsl9kBOGe\n-----END PRIVATE KEY-----\n",
+  "client_email": "bot-jadwal@bot-wa-kalender.iam.gserviceaccount.com",
+  "client_id": "105603257789349854354",
+  "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+  "token_uri": "https://oauth2.googleapis.com/token",
+  "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+  "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/bot-jadwal%40bot-wa-kalender.iam.gserviceaccount.com",
+  "universe_domain": "googleapis.com"
+}
