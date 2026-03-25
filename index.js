@@ -119,7 +119,7 @@ client.on('message_create', async (msg) => {
 
             // Jika TIDAK Premium, Tolak akses (kecuali command tertentu)
             if (!isPremium) {
-                const allowed = ['!menu', '!daftarpremium', '!owner', '!premium'];
+                const allowed = ['!menu', '!daftarpremium', '!owner', '!premium', '!ww']; // Tambahkan '!ww'
                 const firstWord = body.split(' ')[0].toLowerCase();
                 
                 if (body.startsWith('!') && !allowed.includes(firstWord)) {

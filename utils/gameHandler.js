@@ -388,4 +388,116 @@ module.exports = async (client, msg) => {
     } catch (err) {
         console.error('[ERROR GAME HANDLER]:', err);
     }
+
+
+    // ==========================================
+// 🐺 6. WEREWOLF HANDLER (NIGHT & VOTING)
+// ==========================================
+// 6A. FASE MALAM DI PRIVATE CHAT (PC)
+if (!msg.from.includes('@g.us') && msg.body.toLowerCase().startsWith('!ww ')) {
+    if (client.wwPlayersMap && client.wwPlayersMap[senderId]) {
+        const grupId = client.wwPlayersMap[senderId];
+        const game = client.wwGames[grupId];
+
+        if (game && game.phase === 'night') {
+            const myRoleData = game.rolesAssigned[senderId];
+            if (!myRoleData || !myRoleData.isAlive || myRoleData.role === 'villager') return true;
+
+            const targetIndex = parseInt(body.split(' ')[1]) - 1;
+            if (isNaN(targetIndex) || !game.players[targetIndex]) {
+                await msg.reply('❌ Nomor pemain tidak valid!');
+                return true;
+            }
+
+            const targetId = game.players[targetIndex].id;
+            if (!game.rolesAssigned[targetId].isAlive) {
+                await msg.reply('❌ Target sudah mati!');
+                return true;
+            }
+
+            if (myRoleData.role === 'werewolf') {
+                game.nightActions['werewolf'] = targetId;
+                await msg.reply(`🐺 Kamu memilih untuk membunuh ${game.players[targetIndex].name}.`);
+            } else if (myRoleData.role === 'guard') {
+                game.nightActions['guard'] = targetId;
+                await msg.reply(`🛡️ Kamu melindungi ${game.players[targetIndex].name} malam ini.`);
+            } else if (myRoleData.role === 'seer') {
+                const targetRole = game.rolesAssigned[targetId].role;
+                const roleName = targetRole === 'werewolf' ? 'JAHAT 🐺' : 'BAIK 🧑‍🌾';
+                await msg.reply(`👁️ Hasil terawang: ${game.players[targetIndex].name} adalah orang yang *${roleName}*.`);
+            }
+            return true;
+        }
+    }
+}
+
+// 6B. FASE VOTING DI GRUP
+if (msg.from.includes('@g.us') && msg.body.toLowerCase().startsWith('!ww vote ')) {
+    if (client.wwGames && client.wwGames[msg.from]) {
+        const game = client.wwGames[msg.from];
+        if (game.phase !== 'voting') return true;
+        
+        const myRoleData = game.rolesAssigned[senderId];
+        if (!myRoleData || !myRoleData.isAlive) {
+            await msg.reply('💀 Orang mati dilarang voting!');
+            return true;
+        }
+
+        const targetIndex = parseInt(body.split(' ')[2]) - 1;
+        if (isNaN(targetIndex) || !game.players[targetIndex]) return true;
+
+        const targetId = game.players[targetIndex].id;
+        if (!game.rolesAssigned[targetId].isAlive) {
+            await msg.reply('❌ Target sudah mati!');
+            return true;
+        }
+
+        game.votes[senderId] = targetId;
+        await msg.reply(`✅ Kamu mem-vote ${game.players[targetIndex].name}.`);
+
+        // Hitung apakah semua yang hidup sudah vote
+        const alivePlayers = Object.values(game.rolesAssigned).filter(p => p.isAlive).length;
+        if (Object.keys(game.votes).length >= alivePlayers) {
+            // Evaluasi Voting
+            const voteCounts = {};
+            for (let v in game.votes) {
+                voteCounts[game.votes[v]] = (voteCounts[game.votes[v]] || 0) + 1;
+            }
+
+            // Cari vote terbanyak
+            let maxVotes = 0;
+            let executedId = null;
+            for (let tId in voteCounts) {
+                if (voteCounts[tId] > maxVotes) {
+                    maxVotes = voteCounts[tId];
+                    executedId = tId;
+                }
+            }
+
+            let resultMsg = `⚖️ *VOTING SELESAI*\n\n`;
+            if (executedId) {
+                game.rolesAssigned[executedId].isAlive = false;
+                resultMsg += `Warga telah sepakat! 💀 *${game.rolesAssigned[executedId].name}* dieksekusi mati.\n\n`;
+            }
+
+            // Cek kemenangan lagi
+            const check = checkWin(game); // Anda perlu memastikan fungsi checkWin bisa diakses di sini, atau import.
+            if (check) {
+                resultMsg += check;
+                await client.sendMessage(msg.from, resultMsg);
+                delete client.wwGames[msg.from];
+                return true;
+            }
+
+            await client.sendMessage(msg.from, resultMsg + `Malam akan segera tiba kembali...`);
+            game.day += 1;
+            setTimeout(() => {
+                // Panggil ulang startNightPhase (Butuh direfaktorisasi agar fungsi bisa dipanggil lintas file)
+                // Solusi: Anda bisa membuat event emitter atau memisahkan logika utama Werewolf ke sebuah file class terpisah.
+            }, 3000);
+        }
+        return true;
+    }
+}
+
 };
