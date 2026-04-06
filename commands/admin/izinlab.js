@@ -81,7 +81,7 @@ module.exports = {
             let pengajuName = contact.pushname || 'Owner';
             
             // PERUBAHAN TEKS INSTRUKSI DI BAWAH INI
-            const pesanPemberiIzin = `🚨 *PERMINTAAN IZIN LAB KOMPUTER BARU* 🚨\n\n*ID Tiket:* ${ticketId}\n*Nama Pengaju:* ${pengajuName}\n\n*Detail Pengajuan:*\n${isiForm}\n\n==========================\n*TOMBOL RESPON OTOMATIS*\n*(Silakan balas / reply pesan ini)*\n\n✅ Ketik: *!izinkan*\n❌ Ketik: *!tolak*`;
+            const pesanPemberiIzin = `🚨 *PERMINTAAN IZIN LAB KOMPUTER BARU* 🚨\n\n*ID Tiket:* ${ticketId}\n*Nama Pengaju:* ${pengajuName}\n\n*Detail Pengajuan:*\n${isiForm}\n\n==========================\n*TOMBOL RESPON OTOMATIS*\n*(Silakan balas / reply pesan ini)*\n\n✅ Ketik: *!izinkan*\n❌ Ketik: *!tolak [alasan penolakan]*`;
 
             await client.sendMessage(NOMOR_PEMBERI_IZIN, pesanPemberiIzin);
             console.log(`[DEBUG IZINLAB] --- SUKSES KESELURUHAN ---`);
