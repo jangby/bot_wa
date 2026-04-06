@@ -2,7 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const { MessageMedia } = require('whatsapp-web.js');
 
-const NOMOR_PEMBERI_IZIN = '6281234567890@c.us';
+const NOMOR_PEMBERI_IZIN = '6285188427706@c.us';
 
 module.exports = {
     name: 'rekapizin',
