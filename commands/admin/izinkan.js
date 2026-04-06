@@ -2,7 +2,7 @@ const fs = require('fs');
 const path = require('path');
 
 // ⚠️ NOMOR PEMBERI IZIN HARUS SAMA
-const NOMOR_PEMBERI_IZIN = '6285188427706@c.us';
+const NOMOR_PEMBERI_IZIN = '168032676651233@lid';
 
 module.exports = {
     name: 'izinkan',

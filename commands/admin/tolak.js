@@ -1,7 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 
-const NOMOR_PEMBERI_IZIN = '6285188427706@c.us';
+const NOMOR_PEMBERI_IZIN = '168032676651233@lid';
 
 module.exports = {
     name: 'tolak',
