@@ -8,6 +8,8 @@ module.exports = {
     name: 'izinkan',
     description: 'Memberikan persetujuan akses lab (dengan cara reply)',
     async execute(client, msg, args) {
+        console.log("NOMOR YANG NGETIK:", msg.from); 
+        console.log("NOMOR DI SISTEM:", NOMOR_PEMBERI_IZIN);
         if (msg.from !== NOMOR_PEMBERI_IZIN) return msg.reply('❌ Anda tidak memiliki otoritas.');
 
         let ticketId = null;
