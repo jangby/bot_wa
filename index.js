@@ -349,7 +349,7 @@ client.on('message_create', async (msg) => {
         // ==========================================
         if (!body.startsWith('!')) return; // Hanya respon yg depannya !
 
-        const args = body.slice(1).trim().split(/ +/);
+        const args = body.slice(1).trim().split(/\s+/);
         const commandName = args.shift().toLowerCase();
 
         if (!client.commands.has(commandName)) return; // Command gak dikenal

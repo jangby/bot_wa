@@ -59,7 +59,7 @@ module.exports = {
         // JIKA OWNER MENGIRIM KEMBALI FORMAT YANG SUDAH DIISI
         console.log(`[DEBUG IZINLAB] Argumen terdeteksi! Memproses penyimpanan data...`);
         try {
-            const isiForm = args.join(' ');
+            const isiForm = msg.body.replace(/^!izinlab\s*/i, '').trim();
             const ticketId = 'LAB' + Date.now().toString().slice(-5);
             console.log(`[DEBUG IZINLAB] Membuat Tiket ID: ${ticketId}`);
 
