@@ -1,31 +1,50 @@
 const fs = require('fs');
 const path = require('path');
 
-const NOMOR_PEMBERI_IZIN = '6282117556309@c.us';
+const NOMOR_PEMBERI_IZIN = '6285188427706@c.us';
 
 module.exports = {
     name: 'tolak',
-    description: 'Menolak persetujuan akses lab',
+    description: 'Menolak persetujuan akses lab (dengan cara reply)',
     async execute(client, msg, args) {
-        if (msg.from !== NOMOR_PEMBERI_IZIN) return msg.reply('❌ Anda tidak memiliki otoritas untuk perintah ini.');
+        if (msg.from !== NOMOR_PEMBERI_IZIN) return msg.reply('❌ Anda tidak memiliki otoritas.');
 
-        if (args.length === 0) return msg.reply('⚠️ Harap masukkan ID Tiket!\nContoh: *!tolak LAB12345*');
+        let ticketId = null;
+
+        // 1. CEK APAKAH ADMIN ME-REPLY PESAN
+        if (msg.hasQuotedMsg) {
+            const quotedMsg = await msg.getQuotedMessage();
+            const match = quotedMsg.body.match(/ID Tiket:\*?\s*(LAB\d+)/i);
+            if (match) {
+                ticketId = match[1];
+            }
+        }
+
+        // 2. JIKA TIDAK ME-REPLY, CEK MANUAL
+        if (!ticketId && args.length > 0) {
+            ticketId = args[0];
+        }
+
+        if (!ticketId) {
+            return msg.reply('⚠️ Harap *reply (balas)* pesan permintaan izin dari bot dengan perintah *!tolak*');
+        }
         
-        const ticketId = args[0];
         const dbPath = path.join(__dirname, '../../data/izinlab.json');
-        
-        if (!fs.existsSync(dbPath)) return;
+        if (!fs.existsSync(dbPath)) return msg.reply('📂 Belum ada data pengajuan lab.');
         const db = JSON.parse(fs.readFileSync(dbPath));
         
-        if (!db[ticketId]) return msg.reply('❌ ID Tiket tersebut tidak ditemukan!');
+        if (!db[ticketId]) return msg.reply('❌ ID Tiket tersebut tidak ditemukan di database!');
         if (db[ticketId].status !== 'MENUNGGU PERSETUJUAN') return msg.reply(`⚠️ Pengajuan ini sudah diproses sebelumnya dengan status: *${db[ticketId].status}*`);
 
+        // Update Data JSON
         db[ticketId].status = 'DITOLAK';
         db[ticketId].waktu_direspon = new Date().toISOString();
         fs.writeFileSync(dbPath, JSON.stringify(db, null, 2));
 
-        await msg.reply(`❌ Pengajuan dengan ID *${ticketId}* berhasil DITOLAK.`);
+        // Konfirmasi ke yang ACC
+        await msg.reply(`❌ Pengajuan Lab (ID: *${ticketId}*) berhasil DITOLAK.`);
 
+        // Teruskan info ke Owner
         const pesanKeOwner = `⚠️ *MOHON MAAF*\n\nPermintaan Izin Lab Komputer (ID: *${ticketId}*) telah *DITOLAK* oleh pengurus.\n\nStatus saat ini: ❌ DITOLAK`;
         await client.sendMessage(db[ticketId].pengaju, pesanKeOwner);
     }

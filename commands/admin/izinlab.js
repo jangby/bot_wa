@@ -2,7 +2,7 @@ const fs = require('fs');
 const path = require('path');
 
 // ⚠️ GANTI NOMOR INI DENGAN NOMOR WA PEMBERI IZIN (Gunakan akhiran @c.us)
-const NOMOR_PEMBERI_IZIN = '6282117556309@c.us'; 
+const NOMOR_PEMBERI_IZIN = '6285188427706@c.us'; 
 
 module.exports = {
     name: 'izinlab',
@@ -80,7 +80,8 @@ module.exports = {
             console.log(`[DEBUG IZINLAB] Bersiap mengirim pesan ke Nomor Pemberi Izin (${NOMOR_PEMBERI_IZIN})...`);
             let pengajuName = contact.pushname || 'Owner';
             
-            const pesanPemberiIzin = `🚨 *PERMINTAAN IZIN LAB KOMPUTER BARU* 🚨\n\n*ID Tiket:* ${ticketId}\n*Nama Pengaju:* ${pengajuName}\n\n*Detail Pengajuan:*\n${isiForm}\n\n==========================\n*TOMBOL RESPON OTOMATIS*\n*(Balas pesan ini dengan perintah di bawah)*\n\n✅ Ketik: *!izinkan ${ticketId}*\n❌ Ketik: *!tolak ${ticketId}*`;
+            // PERUBAHAN TEKS INSTRUKSI DI BAWAH INI
+            const pesanPemberiIzin = `🚨 *PERMINTAAN IZIN LAB KOMPUTER BARU* 🚨\n\n*ID Tiket:* ${ticketId}\n*Nama Pengaju:* ${pengajuName}\n\n*Detail Pengajuan:*\n${isiForm}\n\n==========================\n*TOMBOL RESPON OTOMATIS*\n*(Silakan balas / reply pesan ini)*\n\n✅ Ketik: *!izinkan*\n❌ Ketik: *!tolak*`;
 
             await client.sendMessage(NOMOR_PEMBERI_IZIN, pesanPemberiIzin);
             console.log(`[DEBUG IZINLAB] --- SUKSES KESELURUHAN ---`);

@@ -1,25 +1,42 @@
 const fs = require('fs');
 const path = require('path');
 
-// ⚠️ NOMOR PEMBERI IZIN HARUS SAMA DENGAN FILE SEBELUMNYA
-const NOMOR_PEMBERI_IZIN = '6282117556309@c.us';
+// ⚠️ NOMOR PEMBERI IZIN HARUS SAMA
+const NOMOR_PEMBERI_IZIN = '6285188427706@c.us';
 
 module.exports = {
     name: 'izinkan',
-    description: 'Memberikan persetujuan akses lab',
+    description: 'Memberikan persetujuan akses lab (dengan cara reply)',
     async execute(client, msg, args) {
-        // Kunci agar hanya Pemberi Izin yang bisa merespon
-        if (msg.from !== NOMOR_PEMBERI_IZIN) return msg.reply('❌ Anda tidak memiliki otoritas untuk menggunakan perintah ini.');
+        if (msg.from !== NOMOR_PEMBERI_IZIN) return msg.reply('❌ Anda tidak memiliki otoritas.');
 
-        if (args.length === 0) return msg.reply('⚠️ Harap masukkan ID Tiket!\nContoh: *!izinkan LAB12345*');
+        let ticketId = null;
+
+        // 1. CEK APAKAH ADMIN ME-REPLY PESAN
+        if (msg.hasQuotedMsg) {
+            const quotedMsg = await msg.getQuotedMessage();
+            // Gunakan Regex untuk mencari teks "ID Tiket: LABxxx" di pesan yang di-reply
+            const match = quotedMsg.body.match(/ID Tiket:\*?\s*(LAB\d+)/i);
+            if (match) {
+                ticketId = match[1]; // Mengambil tulisan LABxxx
+            }
+        }
+
+        // 2. JIKA TIDAK ME-REPLY, CEK APAKAH ADMIN MENGETIK MANUAL (Sebagai Backup)
+        if (!ticketId && args.length > 0) {
+            ticketId = args[0];
+        }
+
+        // Jika tetap tidak ketemu ID-nya
+        if (!ticketId) {
+            return msg.reply('⚠️ Harap *reply (balas)* pesan permintaan izin dari bot dengan perintah *!izinkan*');
+        }
         
-        const ticketId = args[0];
         const dbPath = path.join(__dirname, '../../data/izinlab.json');
-        
         if (!fs.existsSync(dbPath)) return msg.reply('📂 Belum ada data pengajuan lab.');
         const db = JSON.parse(fs.readFileSync(dbPath));
         
-        if (!db[ticketId]) return msg.reply('❌ ID Tiket tersebut tidak ditemukan!');
+        if (!db[ticketId]) return msg.reply('❌ ID Tiket tersebut tidak ditemukan di database!');
         if (db[ticketId].status !== 'MENUNGGU PERSETUJUAN') return msg.reply(`⚠️ Pengajuan ini sudah diproses sebelumnya dengan status: *${db[ticketId].status}*`);
 
         // Update Data JSON
@@ -28,7 +45,7 @@ module.exports = {
         fs.writeFileSync(dbPath, JSON.stringify(db, null, 2));
 
         // Konfirmasi ke yang ACC
-        await msg.reply(`✅ Berhasil! Pengajuan dengan ID *${ticketId}* telah DIIZINKAN.`);
+        await msg.reply(`✅ Berhasil! Pengajuan Lab (ID: *${ticketId}*) telah DIIZINKAN.`);
 
         // Teruskan info ke Owner
         const pesanKeOwner = `🎉 *KABAR BAIK!*\n\nPermintaan Izin Lab Komputer (ID: *${ticketId}*) telah *DIIZINKAN* oleh pengurus.\n\nStatus saat ini: ✅ DIIZINKAN`;
