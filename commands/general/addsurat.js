@@ -40,7 +40,7 @@ module.exports = {
         if (args.length === 0) {
             const pesanInstruksi = `*FORMAT PEMBUATAN NOMOR SURAT*\n\nSilakan copy pesan template yang ada di bawah ini, isi data yang kosong, lalu kirimkan kembali ke grup.\n\n_Catatan: Anda cukup mengetik singkatan (SK, SU) atau namanya (Undangan), sistem akan otomatis mengonversi ke kode resmi (02/SU)._`;
             
-            const pesanFormat = `!addsurat\nAsal Surat: [Yayasan / Pesantren]\nJenis Surat: [Contoh: Undangan / SK / SPb]\nNama Surat: [Contoh: Rapat Wali Santri]`;
+            const pesanFormat = `.!addsurat\nAsal Surat: [Yayasan / Pesantren]\nJenis Surat: [Contoh: Undangan / SK / SPb]\nNama Surat: [Contoh: Rapat Wali Santri]`;
             
             // Mengirim 2 pesan secara berurutan
             await msg.reply(pesanInstruksi);
