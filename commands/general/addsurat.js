@@ -2,7 +2,6 @@ const fs = require('fs');
 const path = require('path');
 
 // 🗂️ DAFTAR MAPPING KODE SURAT
-// Bot akan mendeteksi berbagai cara pengetikan dan mengubahnya ke kode resmi
 const KODE_SURAT = {
     'surat keputusan': '01/SK', 'sk': '01/SK', '01/sk': '01/SK',
     'surat undangan': '02/SU', 'undangan': '02/SU', 'su': '02/SU', '02/su': '02/SU',
@@ -23,7 +22,7 @@ const KODE_SURAT = {
 
 module.exports = {
     name: 'addsurat',
-    description: 'Membuat nomor surat otomatis untuk grup (dengan kode spesifik)',
+    description: 'Membuat nomor surat otomatis untuk grup (dengan pesan terpisah)',
     async execute(client, msg, args) {
         // Kunci khusus Grup
         if (!msg.from.endsWith('@g.us')) return msg.reply('❌ Fitur ini hanya bisa digunakan di dalam Grup!');
@@ -39,8 +38,13 @@ module.exports = {
 
         // JIKA HANYA MENGETIK !addsurat
         if (args.length === 0) {
-            const template = `*FORMAT PEMBUATAN NOMOR SURAT*\n\nSilakan copy template di bawah ini, isi data yang kosong, dan kirimkan kembali ke grup.\n\n!addsurat\nAsal Surat: [Yayasan / Pesantren]\nJenis Surat: [Contoh: Undangan / SK / SPb]\nNama Surat: [Contoh: Rapat Wali Santri]\n\n_Catatan: Anda cukup mengetik singkatan (SK, SU) atau namanya (Undangan), sistem akan otomatis mengonversi ke kode resmi (02/SU)._`;
-            return msg.reply(template);
+            const pesanInstruksi = `*FORMAT PEMBUATAN NOMOR SURAT*\n\nSilakan copy pesan template yang ada di bawah ini, isi data yang kosong, lalu kirimkan kembali ke grup.\n\n_Catatan: Anda cukup mengetik singkatan (SK, SU) atau namanya (Undangan), sistem akan otomatis mengonversi ke kode resmi (02/SU)._`;
+            
+            const pesanFormat = `!addsurat\nAsal Surat: [Yayasan / Pesantren]\nJenis Surat: [Contoh: Undangan / SK / SPb]\nNama Surat: [Contoh: Rapat Wali Santri]`;
+            
+            // Mengirim 2 pesan secara berurutan
+            await msg.reply(pesanInstruksi);
+            return client.sendMessage(msg.from, pesanFormat);
         }
 
         // JIKA MENGIRIM KEMBALI FORMAT YANG SUDAH DIISI
@@ -69,7 +73,7 @@ module.exports = {
         // Jika kode tidak ada di daftar
         if (!kodeJenisSurat) {
             let errorMsg = `⚠️ *Jenis Surat "${jenis}" tidak dikenali!*\nSilakan isi bagian Jenis Surat dengan salah satu kode/nama berikut:\n\n`;
-            errorMsg += `🔹 SK (Surat Keputusan)\n🔹 SU (Surat Undangan)\n🔹 SPm (Surat Permohonan)\n🔹 SPb (Surat Pemberitahuan)\n🔹 SPp (Surat Peminjaman)\n🔹 SPn (Surat Pernyataan)\n🔹 SM (Surat Mandat)\n🔹 ST (Surat Tugas)\n🔹 SKet (Surat Keterangan)\n🔹 SR (Surat Rekomendasi)\n🔹 SB (Surat Balasan)\n🔹 SPPD (Surat Perintah Perjalanan Dinas)\n🔹 SRT (Sertifikat)\n🔹 PK (Perjanjian Kerja)\n🔹 SPeng (Surat Pengantar)`;
+            errorMsg += `🔹 SK (Surat Keputusan)\n🔹 SU (Surat Undangan)\n🔹 SPm (Surat Permohonan)\n🔹 SPb (Surat Pemberitahuan)\n🔹 SPp (Surat Peminjaman)\n🔹 SPn (Surat Pernyataan)\n🔹 SM (Surat Mandat)\n🔹 ST (Surat Tugas)\n🔹 SKet (Surat Keterangan)\n🔹 SR (Surat Rekomendasi)\n🔹 SB (Surat Balasan)\n🔹 SPPD (Surat Perjalanan Dinas)\n🔹 SRT (Sertifikat)\n🔹 PK (Perjanjian Kerja)\n🔹 SPeng (Surat Pengantar)`;
             return msg.reply(errorMsg);
         }
 
