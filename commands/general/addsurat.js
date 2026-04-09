@@ -25,7 +25,7 @@ module.exports = {
     description: 'Membuat nomor surat otomatis untuk grup (dengan pesan terpisah)',
     async execute(client, msg, args) {
         // Kunci khusus Grup
-        if (!chat.isGroup) return msg.reply('❌ Fitur ini hanya bisa digunakan di dalam Grup!');
+        if (!msg.from.endsWith('@g.us')) return msg.reply('❌ Fitur ini hanya bisa digunakan di dalam Grup!');
 
         const dbPath = path.join(__dirname, '../../data/surat.json');
         
