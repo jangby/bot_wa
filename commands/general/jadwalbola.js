@@ -3,6 +3,7 @@ const axios = require('axios');
 module.exports = {
     name: 'jadwalbola',
     description: 'Lihat jadwal pertandingan bola hari ini',
+    type: 'general',
     async execute(client, msg, args) {
         // DAPATKAN API KEY GRATIS DARI RAPIDAPI (API-FOOTBALL)
         const apiKey = '5f107f77dcmsh965b263e2cbffe0p1adc04jsn867fa2171f09';
