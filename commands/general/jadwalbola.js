@@ -5,7 +5,7 @@ module.exports = {
     description: 'Lihat jadwal pertandingan bola hari ini',
     async execute(client, msg, args) {
         // DAPATKAN API KEY GRATIS DARI RAPIDAPI (API-FOOTBALL)
-        const apiKey = 'MASUKKAN_API_KEY_RAPIDAPI_DISINI';
+        const apiKey = '5f107f77dcmsh965b263e2cbffe0p1adc04jsn867fa2171f09';
 
         if (apiKey === 'MASUKKAN_API_KEY_RAPIDAPI_DISINI') {
             return msg.reply('❌ API Key Jadwal Bola belum diisi oleh Owner bot.');

@@ -3,6 +3,7 @@ const axios = require('axios');
 module.exports = {
     name: 'cekresi',
     description: 'Cek status resi pengiriman',
+    type: 'general',
     async execute(client, msg, args) {
         // Format: !cekresi [kurir] [nomor_resi]
         if (args.length < 2) {
@@ -13,7 +14,7 @@ module.exports = {
         const resi = args[1];
         
         // DAFTAR DI BINDERBYTE UNTUK DAPAT API KEY GRATIS
-        const apiKey = 'MASUKKAN_API_KEY_BINDERBYTE_DISINI'; 
+        const apiKey = '63d2bbc673aa7795571b5b9355f1d3a727b0ca5659cda30ee21c7e6662dc8ab9'; 
 
         if (apiKey === 'MASUKKAN_API_KEY_BINDERBYTE_DISINI') {
             return msg.reply('❌ API Key Cek Resi belum diisi oleh Owner bot.');
