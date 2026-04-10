@@ -9,16 +9,24 @@ module.exports = {
         const apiKey = 'FA9vyWVeeBDGWdMqStMqGeFc'; 
 
         try {
-            // 1. Cek apakah ada pesan yang di-reply
-            if (!msg.hasQuotedMsg) {
-                return msg.reply('❌ Reply foto yang ingin dihapus latar belakangnya dengan perintah *!hapusbg*');
+            let mediaMsg = null;
+
+            // 1. Cek apakah pesan saat ini (yang diketik dengan !hapusbg) memiliki foto
+            if (msg.hasMedia && (msg.type === 'image' || msg.type === 'document')) {
+                mediaMsg = msg;
+            } 
+            // 2. Jika tidak, cek apakah pengguna me-reply pesan lain
+            else if (msg.hasQuotedMsg) {
+                const quotedMsg = await msg.getQuotedMessage();
+                // Cek apakah pesan yang di-reply adalah foto
+                if (quotedMsg.hasMedia && (quotedMsg.type === 'image' || quotedMsg.type === 'document')) {
+                    mediaMsg = quotedMsg;
+                }
             }
 
-            const quotedMsg = await msg.getQuotedMessage();
-
-            // 2. Pastikan pesan yang di-reply adalah sebuah gambar (foto)
-            if (!quotedMsg.hasMedia || quotedMsg.type !== 'image') {
-                return msg.reply('❌ Pesan yang kamu reply bukan berupa foto!');
+            // 3. Jika dari kedua cara di atas tidak ditemukan foto, berikan peringatan
+            if (!mediaMsg) {
+                return msg.reply('❌ Kirim foto dengan caption *!hapusbg* atau reply foto yang sudah ada dengan perintah *!hapusbg*');
             }
 
             if (apiKey === 'MASUKKAN_API_KEY_ANDA_DISINI') {
@@ -28,10 +36,10 @@ module.exports = {
             await msg.react('⏳');
             msg.reply('⏳ Sedang memproses gambar, harap tunggu sebentar...');
 
-            // 3. Unduh gambar yang di-reply
-            const media = await quotedMsg.downloadMedia();
+            // 4. Unduh gambar (dari pesan utama ataupun pesan reply)
+            const media = await mediaMsg.downloadMedia();
 
-            // 4. Kirim gambar ke API Remove.bg menggunakan format base64
+            // 5. Kirim gambar ke API Remove.bg
             const response = await axios.post(
                 'https://api.remove.bg/v1.0/removebg',
                 {
@@ -43,17 +51,16 @@ module.exports = {
                         'X-Api-Key': apiKey,
                         'Content-Type': 'application/json'
                     },
-                    responseType: 'arraybuffer' // Penting: agar data diterima dalam format binary gambar
+                    responseType: 'arraybuffer' 
                 }
             );
 
-            // 5. Ubah hasil response (binary) kembali menjadi Base64
+            // 6. Ubah hasil response kembali menjadi Base64
             const base64Data = Buffer.from(response.data, 'binary').toString('base64');
             
-            // 6. Buat objek media baru dengan tipe PNG (karena backgroundnya transparan)
+            // 7. Buat objek media baru dan kirim hasilnya
             const newMedia = new MessageMedia('image/png', base64Data, 'nobg.png');
 
-            // 7. Kirim hasilnya
             await client.sendMessage(msg.from, newMedia, { 
                 caption: '✨ Latar belakang berhasil dihapus!' 
             });
@@ -63,7 +70,7 @@ module.exports = {
         } catch (error) {
             console.error('Error Hapus BG:', error.response ? error.response.data : error.message);
             await msg.react('❌');
-            msg.reply('❌ Gagal menghapus latar belakang. Pastikan gambar memiliki objek utama (manusia/barang) yang jelas atau limit API bulanan kamu belum habis.');
+            msg.reply('❌ Gagal menghapus latar belakang. Pastikan gambar memiliki objek utama yang jelas atau cek limit API Anda.');
         }
     }
 };
