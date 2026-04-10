@@ -1,6 +1,7 @@
 module.exports = {
     name: 'sholat',
     description: 'Cek jadwal sholat',
+    type: 'general',
     async execute(client, msg, args) {
         const kota = args.join(' ');
         if (!kota) return msg.reply('❌ Masukkan nama kota! Contoh: *!sholat Jakarta*');

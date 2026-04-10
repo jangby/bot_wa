@@ -1,6 +1,7 @@
 module.exports = {
     name: 'menu',
     description: 'Menampilkan daftar perintah lengkap',
+    type: 'general',
     async execute(client, msg, args, { contact }) {
         const pushname = contact.pushname || contact.number;
         

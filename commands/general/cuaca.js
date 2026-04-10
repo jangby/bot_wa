@@ -1,6 +1,7 @@
 module.exports = {
     name: 'cuaca',
     description: 'Cek info cuaca terkini',
+    type: 'general',
     async execute(client, msg, args) {
         const kota = args.join(' ');
         if (!kota) return msg.reply('❌ Masukkan nama kota! Contoh: *!cuaca Bandung*');

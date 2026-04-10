@@ -4,6 +4,7 @@ const { MessageMedia } = require('whatsapp-web.js');
 module.exports = {
     name: 'hapusbg',
     description: 'Hapus latar belakang foto',
+    type: 'general',
     async execute(client, msg, args) {
         // SILAKAN MASUKKAN API KEY ANDA DARI REMOVE.BG DI BAWAH INI
         const apiKey = 'FA9vyWVeeBDGWdMqStMqGeFc'; 

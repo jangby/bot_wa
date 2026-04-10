@@ -1,6 +1,7 @@
 module.exports = {
     name: 'quran',
     description: 'Cari ayat Al-Quran',
+    type: 'general',
     async execute(client, msg, args) {
         if (args.length < 2) return msg.reply('❌ Format: *!quran [no_surah] [no_ayat]*\nContoh: *!quran 1 1*');
 

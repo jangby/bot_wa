@@ -3,6 +3,7 @@ const { MessageMedia } = require('whatsapp-web.js');
 module.exports = {
     name: 'qrcode',
     description: 'Buat QR Code dari teks atau link',
+    type: 'general',
     async execute(client, msg, args) {
         // Cek apakah ada teks yang dimasukkan
         if (args.length === 0) {

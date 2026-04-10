@@ -1,6 +1,7 @@
 module.exports = {
     name: 'lirik',
     description: 'Mencari lirik lagu menggunakan Qwen2.5 Lokal',
+    type: 'general',
     async execute(client, msg, args) {
         if (args.length === 0) return msg.reply('⚠️ Masukkan judul lagunya!');
 

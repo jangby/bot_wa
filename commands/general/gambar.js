@@ -3,6 +3,7 @@ const { MessageMedia } = require('whatsapp-web.js');
 module.exports = {
     name: 'gambar',
     description: 'Membuat gambar dari teks menggunakan AI (Multi-Server)',
+    type: 'general',
     async execute(client, msg, args) {
         if (args.length === 0) {
             return msg.reply('⚠️ Masukkan deskripsi gambarnya!\n\n*Contoh:* !gambar kucing oren gemuk pakai kacamata hitam di luar angkasa');

@@ -1,6 +1,7 @@
 module.exports = {
     name: 'wiki',
     description: 'Mencari informasi di Wikipedia',
+    type: 'general',
     async execute(client, msg, args) {
         if (args.length === 0) return msg.reply('⚠️ Apa yang ingin kamu cari?\nContoh: *!wiki Borobudur*');
 

@@ -98,38 +98,6 @@ client.on('message_create', async (msg) => {
         }
 
         // ==========================================
-        // 👑 2. CEK PREMIUM (GATEKEEPER PC)
-        // ==========================================
-        // Jika chat di PC (bukan grup) DAN bukan Owner
-        if (!chat.isGroup && !isOwner) {
-            const premPath = path.join(__dirname, './data/premium.json');
-            let isPremium = false;
-            
-            if (fs.existsSync(premPath)) {
-                const premiumUsers = JSON.parse(fs.readFileSync(premPath));
-                const expDate = premiumUsers[senderId]; // Di PC senderId = msg.from
-                
-                if (expDate && expDate > Date.now()) {
-                    isPremium = true;
-                } else if (expDate) {
-                    delete premiumUsers[senderId]; // Hapus jika expired
-                    fs.writeFileSync(premPath, JSON.stringify(premiumUsers, null, 2));
-                }
-            }
-
-            // Jika TIDAK Premium, Tolak akses (kecuali command tertentu)
-            if (!isPremium) {
-                const allowed = ['!menu', '!daftarpremium', '!owner', '!premium', '!ww', '!izinkan', '!tolak', '!rekapizin'];
-                const firstWord = body.split(' ')[0].toLowerCase();
-                
-                if (body.startsWith('!') && !allowed.includes(firstWord)) {
-                    return msg.reply(`⛔ *AKSES DITOLAK* ⛔\n\nFitur bot di Private Chat (PC) khusus member *PREMIUM*.\nKetik *!daftarpremium* untuk info berlangganan.`);
-                }
-                // Jika chat biasa tanpa tanda seru, abaikan agar bot tidak bawel
-            }
-        }
-
-        // ==========================================
         // 🆙 3. SISTEM LEVELING (XP & REAKSI)
         // ==========================================
         // Hanya jalan di Grup & Bukan pesan dari bot sendiri
@@ -356,6 +324,27 @@ client.on('message_create', async (msg) => {
 
         const command = client.commands.get(commandName);
 
+        // ==========================================
+        // 👑 PINDAHAN CEK PREMIUM (GATEKEEPER PC)
+        // ==========================================
+        // Jika chat di PC, bukan Owner, dan fitur tersebut BUKAN bertipe 'general'
+        const allowedDiPC = ['menu', 'daftarpremium', 'owner', 'premium', 'ww', 'izinkan', 'tolak', 'rekapizin'];
+        
+        if (!chat.isGroup && !isOwner && command.type !== 'general' && !allowedDiPC.includes(commandName)) {
+            const premPath = path.join(__dirname, './data/premium.json');
+            let isPremium = false;
+            
+            if (fs.existsSync(premPath)) {
+                const premiumUsers = JSON.parse(fs.readFileSync(premPath));
+                const expDate = premiumUsers[senderId];
+                if (expDate && expDate > Date.now()) isPremium = true;
+            }
+
+            if (!isPremium) {
+                return msg.reply(`⛔ *AKSES DITOLAK* ⛔\n\nFitur ini jika di Private Chat (PC) khusus member *PREMIUM*.\nKetik *!daftarpremium* untuk info berlangganan.`);
+            }
+        }
+
         // Cek Disable Fitur (Global)
         if (settings.disabled_commands.includes(commandName) && !isOwner) {
             return msg.reply('⚠️ Fitur ini sedang dimatikan Owner.');
@@ -368,17 +357,13 @@ client.on('message_create', async (msg) => {
         const freeCommands = ['menu', 'daftarpremium', 'owner', 'ceklimit', 'topup', 'addpremium', 'on', 'off', 'daftar', 'help'];
         
         if (!freeCommands.includes(commandName)) {
-            // PENTING: isAdmin tidak dikirim ke sini. Jadi Admin Grup tetap kena limit.
-            // Hanya Owner yang kebal.
             const canProceed = await premiumHandler.checkLimit(client, msg, commandName, senderId, isOwner);
-            
-            // Jika limit habis, stop di sini.
             if (!canProceed) return; 
         }
 
         // ==========================================
 
-        // Cek Admin Grup (Untuk argumen di dalam command)
+        // Cek Admin Grup
         let isAdmin = false;
         if (chat.isGroup) {
             const participant = chat.participants.find(p => p.id._serialized === senderId);

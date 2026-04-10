@@ -4,6 +4,7 @@ const { MessageMedia } = require('whatsapp-web.js');
 module.exports = {
     name: 'tts',
     description: 'Ubah teks jadi suara Google',
+    type: 'general',
     async execute(client, msg, args) {
         const text = args.join(' ');
         if (!text) return msg.reply('❌ Masukkan teksnya! Contoh: *!tts Halo semua*');

@@ -4,6 +4,7 @@ const path = require('path');
 module.exports = {
     name: 'catatan',
     description: 'Lihat catatan grup',
+    type: 'general',
     async execute(client, msg, args, { chat }) {
         if (!chat.isGroup) return msg.reply('❌ Hanya untuk grup!');
         

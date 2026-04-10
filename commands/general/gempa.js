@@ -3,6 +3,7 @@ const { MessageMedia } = require('whatsapp-web.js');
 module.exports = {
     name: 'gempa',
     description: 'Info gempa bumi terkini dari BMKG',
+    type: 'general',
     async execute(client, msg, args) {
         // Beri reaksi dan pesan loading
         await msg.react('⏳');

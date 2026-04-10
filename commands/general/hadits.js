@@ -3,6 +3,7 @@ const axios = require('axios');
 module.exports = {
     name: 'hadits',
     description: 'Cari hadits lengkap dengan Arab & Artinya',
+    type: 'general',
     async execute(client, msg, args) {
         // 1. Cek Input User
         if (args.length < 2) {

@@ -4,6 +4,7 @@ const { createCanvas, registerFont } = require('canvas');
 module.exports = {
     name: 'steks',
     description: 'Bikin stiker teks premium',
+    type: 'general',
     async execute(client, msg, args) {
         const text = args.join(' ');
         if (!text) return msg.reply('❌ Masukkan teksnya! Contoh: *!steks Halo Dunia*');

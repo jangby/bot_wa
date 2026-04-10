@@ -3,6 +3,7 @@ const { MessageMedia } = require('whatsapp-web.js');
 module.exports = {
     name: 'ig',
     description: 'Download video Instagram (Sistem Multi-API)',
+    type: 'general',
     async execute(client, msg, args) {
         if (args.length === 0) {
             return msg.reply('⚠️ Mana link Instagram-nya bro?\n\n*Contoh:* !ig https://www.instagram.com/reel/xxxxxx/');

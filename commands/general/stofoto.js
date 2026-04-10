@@ -1,6 +1,7 @@
 module.exports = {
     name: 'stofoto',
     description: 'Ubah stiker kembali menjadi foto',
+    type: 'general',
     async execute(client, msg, args) {
         try {
             // 1. Cek apakah pengguna me-reply pesan lain

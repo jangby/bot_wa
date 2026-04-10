@@ -1,6 +1,7 @@
 module.exports = {
     name: 'sticker',
     description: 'Ubah gambar menjadi stiker',
+    type: 'general',
     async execute(client, msg, args) {
         // Cek apakah pesan memiliki media (gambar/video)
         // Atau apakah user me-reply sebuah pesan yang ada gambarnya

@@ -3,6 +3,7 @@ const { MessageMedia } = require('whatsapp-web.js');
 module.exports = {
     name: 'tiktok',
     description: 'Download video TikTok tanpa watermark',
+    type: 'general',
     async execute(client, msg, args) {
         // 1. Cek apakah user memasukkan link
         if (args.length === 0) {
