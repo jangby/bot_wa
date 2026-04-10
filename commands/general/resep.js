@@ -1,70 +1,47 @@
-const axios = require('axios');
+const yts = require('yt-search');
 
 module.exports = {
     name: 'resep',
-    description: 'Cari resep makanan',
+    description: 'Cari video resep masakan di YouTube',
     type: 'general', // Agar bisa dipakai di chat pribadi
     async execute(client, msg, args) {
         if (args.length === 0) return msg.reply('❌ Masukkan nama masakan! Contoh: *!resep nasi goreng*');
         
-        const query = args.join(' ');
+        // Kita tambahkan kata "resep" di awal secara otomatis agar pencarian YouTube lebih akurat
+        const masakan = args.join(' ');
+        const query = `resep ${masakan}`; 
+        
         await msg.react('⏳');
 
         try {
-            // 1. Cari resep untuk mendapatkan 'key' (ID Resep)
-            const searchUrl = `https://masak-apa.tomorisakura.vercel.app/api/search/?q=${encodeURIComponent(query)}`;
-            const searchRes = await axios.get(searchUrl);
-            
-            // Validasi apakah hasil pencarian kosong
-            if (!searchRes.data || !searchRes.data.status || !searchRes.data.results || searchRes.data.results.length === 0) {
-                return msg.reply(`❌ Resep untuk *${query}* tidak ditemukan. Coba kata kunci lain.`);
+            // Melakukan pencarian ke YouTube
+            const searchResult = await yts(query);
+            const videos = searchResult.videos;
+
+            // Jika tidak ada hasil yang ditemukan
+            if (!videos || videos.length === 0) {
+                return msg.reply(`❌ Video resep untuk *${masakan}* tidak ditemukan di YouTube. Coba kata kunci lain.`);
             }
 
-            // Ambil resep urutan pertama dari hasil pencarian
-            const recipeKey = searchRes.data.results[0].key;
+            // Ambil hasil pencarian teratas (urutan pertama)
+            const video = videos[0];
 
-            // 2. Minta detail lengkap dari resep berdasarkan 'key' tersebut
-            const detailUrl = `https://masak-apa.tomorisakura.vercel.app/api/recipe/${recipeKey}`;
-            const detailRes = await axios.get(detailUrl);
+            // Susun pesan balasan
+            let text = `🍳 *VIDEO RESEP DITEMUKAN* 🍳\n\n`;
+            text += `*Judul:* ${video.title}\n`;
+            text += `*Channel:* ${video.author.name}\n`;
+            text += `*Durasi:* ${video.timestamp}\n`;
+            text += `*Views:* ${video.views.toLocaleString('id-ID')} tayangan\n\n`;
+            text += `🎬 *Tonton videonya di sini:*\n${video.url}`;
 
-            const data = detailRes.data.results;
-
-            if (!data) {
-                return msg.reply('❌ Detail resep tidak dapat dimuat.');
-            }
-
-            // 3. Susun dan Rapikan Pesan
-            let text = `🍳 *${data.title}* 🍳\n\n`;
-            text += `⏱️ *Waktu:* ${data.times || '-'}\n`;
-            text += `🍽️ *Porsi:* ${data.servings || '-'}\n`;
-            text += `📊 *Level:* ${data.difficulty || '-'}\n\n`;
-
-            text += `*🛒 BAHAN-BAHAN:*\n`;
-            if (data.ingredient && data.ingredient.length > 0) {
-                data.ingredient.forEach(bahan => {
-                    text += `• ${bahan}\n`;
-                });
-            } else {
-                text += `• Data bahan tidak tersedia.\n`;
-            }
-
-            text += `\n*👨‍🍳 CARA MEMBUAT:*\n`;
-            if (data.step && data.step.length > 0) {
-                data.step.forEach((langkah) => {
-                    // Format menggunakan quote block (>) agar lebih rapi di WA
-                    text += `> ${langkah}\n`;
-                });
-            } else {
-                text += `• Cara membuat tidak tersedia.\n`;
-            }
-
+            // Kirim pesan balasan
             await msg.reply(text);
             await msg.react('✅');
 
         } catch (error) {
-            console.error('Error Resep:', error.message);
+            console.error('Error Resep YouTube:', error.message);
             await msg.react('❌');
-            msg.reply('❌ Gagal mengambil resep. Server penyedia data mungkin sedang gangguan.');
+            msg.reply('❌ Terjadi kesalahan saat mencari video di YouTube. Silakan coba lagi.');
         }
     }
 };
