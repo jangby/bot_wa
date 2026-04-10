@@ -51,11 +51,7 @@ module.exports = {
                 }
 
                 // Susun pesan balasan ke pengguna
-                let formatIsian = `*FORMAT ISIAN: ${templateName.toUpperCase()}*\n\n`;
-                formatIsian += `Silakan copy teks di bawah ini, *hapus tanda titik (.)* di awal baris, isi data-datanya, lalu kirimkan:\n\n`;
-                
-                // Format menggunakan .!cetaksurat agar tidak dibaca ulang oleh bot (mencegah error)
-                formatIsian += `.!cetaksurat\n`;
+                let formatIsian = `.!cetaksurat\n`;
                 formatIsian += `Template: ${templateName}\n`;
                 
                 variables.forEach(v => {
