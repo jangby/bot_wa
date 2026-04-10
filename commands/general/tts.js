@@ -8,21 +8,29 @@ module.exports = {
         const text = args.join(' ');
         if (!text) return msg.reply('❌ Masukkan teksnya! Contoh: *!tts Halo semua*');
 
+        // Batasi panjang teks agar tidak error (Google TTS via Base64 maksimal 200 karakter)
+        if (text.length > 200) {
+            return msg.reply('❌ Teks terlalu panjang! Maksimal 200 karakter.');
+        }
+
         try {
-            // Generate URL Audio (Bahasa Indonesia)
-            const url = googleTTS.getAudioUrl(text, {
+            // Gunakan getAudioBase64 alih-alih getAudioUrl
+            const base64Audio = await googleTTS.getAudioBase64(text, {
                 lang: 'id',
                 slow: false,
                 host: 'https://translate.google.com',
+                timeout: 10000,
             });
 
+            // Buat objek media dari base64 dengan spesifikasi audio/mp3
+            const media = new MessageMedia('audio/mp3', base64Audio, 'tts.mp3');
+
             // Kirim sebagai Voice Note
-            const media = await MessageMedia.fromUrl(url, { unsafeMime: true });
             await client.sendMessage(msg.from, media, { sendAudioAsVoice: true });
 
         } catch (error) {
-            console.error(error);
-            msg.reply('❌ Gagal membuat suara. Teks mungkin terlalu panjang.');
+            console.error('Error TTS:', error.message);
+            msg.reply('❌ Gagal membuat suara. Silakan coba lagi nanti.');
         }
     }
 };
