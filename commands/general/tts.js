@@ -26,7 +26,7 @@ module.exports = {
             const media = new MessageMedia('audio/mp3', base64Audio, 'tts.mp3');
 
             // Kirim sebagai Voice Note
-            await client.sendMessage(msg.from, media, { sendAudioAsVoice: true });
+            await client.sendMessage(msg.from, media);
 
         } catch (error) {
             console.error('Error TTS:', error.message);
