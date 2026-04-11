@@ -1,55 +1,40 @@
+const lyricsFinder = require('lyrics-finder');
+
 module.exports = {
     name: 'lirik',
-    description: 'Mencari lirik lagu menggunakan Qwen2.5 Lokal',
-    type: 'general',
+    description: 'Cari lirik lagu',
+    type: 'general', // Agar bisa dipakai di chat pribadi
     async execute(client, msg, args) {
-        if (args.length === 0) return msg.reply('⚠️ Masukkan judul lagunya!');
+        if (args.length === 0) {
+            return msg.reply('❌ Masukkan judul lagu! Contoh: *!lirik sempurna andra and the backbone*');
+        }
 
+        // Gabungkan semua argumen menjadi satu kata kunci pencarian
         const query = args.join(' ');
-        await msg.react('🔍');
-        const loadingMsg = await msg.reply(`🔎 Qwen sedang menuliskan lirik untukmu...`);
+        await msg.react('⏳');
 
         try {
-            const response = await fetch('http://localhost:11434/api/generate', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-    model: 'qwen2.5:1.5b',
-    prompt: `[INST] Kamu adalah DATABASE LIRIK LAGU. Tugasmu hanya satu: menuliskan lirik lagu.
-             Dilarang berkomentar, dilarang meminta maaf, dan dilarang mengaku tidak tahu.
-             
-             Tuliskan lirik lagu: "${query}"
-             
-             Format:
-             🎵 *Lirik Lagu Ditemukan* 🎵
-             📌 *Judul:* [Judul]
-             👤 *Penyanyi:* [Artis]
-             ──────────────────
-             [LIRIK LENGKAP] [/INST]`,
-    stream: false,
-    options: {
-        num_predict: 800,
-        temperature: 0.1, // Turunkan suhu agar AI lebih fokus pada data, bukan ngobrol
-        top_p: 0.9
-    }
-}),
-            });
+            // Parameter pertama adalah nama artis, kedua adalah judul. 
+            // Kita bisa mengosongkan parameter artis ("") dan memasukkan seluruh kata kunci ke parameter judul agar pencariannya lebih luas dan pintar.
+            const lirik = await lyricsFinder("", query);
 
-            const data = await response.json();
-            const result = data.response.trim();
-
-            if (!result || result.length < 50) {
-                throw new Error('Hasil terlalu pendek, sepertinya Qwen lagi malas.');
+            if (!lirik) {
+                return msg.reply(`❌ Lirik untuk lagu *${query}* tidak ditemukan. Coba tambahkan nama penyanyinya.`);
             }
 
-            await loadingMsg.delete(true).catch(() => {});
-            await msg.reply(result);
+            // Susun pesan balasan
+            let text = `🎶 *LIRIK LAGU* 🎶\n\n`;
+            text += `*Pencarian:* ${query}\n\n`;
+            text += `_${lirik}_`; // Cetak miring agar terlihat seperti lirik
+
+            // Kirim pesan
+            await msg.reply(text);
             await msg.react('✅');
 
         } catch (error) {
-            console.error('Qwen Lirik Error:', error);
-            await loadingMsg.delete(true).catch(() => {});
-            msg.reply('❌ Qwen gagal memberikan lirik lengkap. Coba sekali lagi atau gunakan judul + artis yang jelas.');
+            console.error('Error Lirik:', error.message);
+            await msg.react('❌');
+            msg.reply('❌ Terjadi kesalahan saat mencari lirik lagu. Silakan coba lagi nanti.');
         }
     }
 };
