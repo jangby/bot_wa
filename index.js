@@ -11,6 +11,10 @@ const gameHandler = require('./utils/gameHandler');
 const levelSystem = require('./utils/level');       // Logika Leveling
 const premiumHandler = require('./utils/premiumHandler'); // Logika Limit & Premium
 
+// Deklarasi memori untuk fitur AFK dan Blacklist sementara
+global.afkMap = new Map();
+global.afkBlacklist = new Map();
+
 // --- INISIALISASI KATA KASAR ---
 const kataKasar = ['anjing', 'babi', 'monyet', 'kunyuk', 'bajingan', 'tolol', 'goblok', 'bangsat', 'kontol', 'memek', 'jembut']; 
 
@@ -69,7 +73,7 @@ client.on('message_create', async (msg) => {
         try { chat = await msg.getChat(); } catch (e) { return; }
         
         const contact = await msg.getContact();
-        const body = msg.body;
+        const body = msg.body || ''; // Fallback aman jika pesan berupa gambar tanpa caption
         const senderId = contact.id._serialized; // ID Pengirim (User)
         
         // Cek Owner (Berdasarkan config.js)
@@ -83,7 +87,7 @@ client.on('message_create', async (msg) => {
         }
 
         // ==========================================
-        // 🛡️ 1. CEK BLACKLIST (HAPUS PESAN & STOP)
+        // 🛡️ 1. CEK BLACKLIST PERMANEN (HAPUS PESAN & STOP)
         // ==========================================
         const blPath = path.join(__dirname, './data/blacklist.json');
         if (fs.existsSync(blPath)) {
@@ -94,6 +98,57 @@ client.on('message_create', async (msg) => {
                     console.log(`[BLACKLIST] Pesan dihapus dari: ${senderId}`);
                 } catch (e) {} // Bot bukan admin, biarkan
                 return; // ⛔ STOP PROSES
+            }
+        }
+
+        // ==========================================
+        // 👮‍♂️ 2. SATPAM AFK & BLACKLIST SEMENTARA
+        // ==========================================
+        // Kita abaikan pesan dari bot itu sendiri agar tidak terjadi looping
+        if (!msg.fromMe) {
+            
+            // A. Cek Blacklist Sementara AFK (5 Menit)
+            if (global.afkBlacklist.has(senderId)) {
+                if (Date.now() < global.afkBlacklist.get(senderId)) {
+                    return; // ⛔ STOP PROSES (Pura-pura mati buat dia)
+                } else {
+                    global.afkBlacklist.delete(senderId); // Waktu habis, bebas!
+                }
+            }
+
+            // B. Cabut status AFK jika orang tersebut mengirim pesan
+            if (global.afkMap.has(senderId)) {
+                global.afkMap.delete(senderId);
+                msg.reply(`👋 Selamat datang kembali! Status AFK kamu telah dicabut.`);
+            }
+
+            // C. Cek Pelanggaran: Apakah dia tag/reply orang yang sedang AFK?
+            if (chat.isGroup) {
+                let taggedAfkUser = null;
+
+                if (msg.hasQuotedMsg) {
+                    const quoted = await msg.getQuotedMessage();
+                    const quotedId = quoted.author || quoted.from;
+                    if (global.afkMap.has(quotedId)) {
+                        taggedAfkUser = { id: quotedId, data: global.afkMap.get(quotedId) };
+                    }
+                }
+
+                if (!taggedAfkUser && msg.mentionedIds && msg.mentionedIds.length > 0) {
+                    for (let id of msg.mentionedIds) {
+                        if (global.afkMap.has(id)) {
+                            taggedAfkUser = { id: id, data: global.afkMap.get(id) };
+                            break;
+                        }
+                    }
+                }
+
+                // Jika terbukti melanggar
+                if (taggedAfkUser && taggedAfkUser.id !== senderId) {
+                    // Masukkan ke blacklist 5 menit
+                    global.afkBlacklist.set(senderId, Date.now() + (5 * 60 * 1000));
+                    return msg.reply(`⚠️ *PERINGATAN SISTEM* ⚠️\n\nJangan tag atau balas pesan dia! Orang tersebut sedang AFK.\n*Alasan:* ${taggedAfkUser.data.reason}\n\n🚨 _HUKUMAN: Kamu di-blacklist. Bot tidak akan merespons pesanmu selama 5 menit!_`);
+                }
             }
         }
 
