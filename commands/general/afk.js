@@ -8,7 +8,7 @@ module.exports = {
             return msg.reply('❌ Fitur ini hanya bisa digunakan di dalam Grup!');
         }
 
-        const senderId = msg.author || msg.from; // Ambil ID pengirim
+        const senderId = msg.author || msg.from; 
         const reason = args.length > 0 ? args.join(' ') : 'Tanpa alasan / Sedang sibuk';
 
         // Simpan data AFK ke dalam memori global
@@ -17,9 +17,11 @@ module.exports = {
             time: Date.now()
         });
 
+        // Susun teks pengumuman dengan aturan baru
         let text = `💤 *STATUS AFK AKTIF* 💤\n\n`;
         text += `Kamu sekarang sedang AFK.\n*Alasan:* ${reason}\n\n`;
-        text += `_Siapapun yang tag atau membalas pesanmu akan diblacklist oleh bot selama 5 menit. Kirim pesan apa saja di grup ini untuk membatalkan status AFK._`;
+        text += `_Siapapun yang tag atau me-reply pesanmu akan diberi peringatan. Jika melanggar hingga 3 kali, pesannya akan dihapus otomatis oleh bot selama 5 menit._\n\n`;
+        text += `*(Kirim pesan apa saja di grup ini untuk membatalkan status AFK)*`;
 
         await msg.reply(text);
     }
