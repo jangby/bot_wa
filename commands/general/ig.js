@@ -1,61 +1,87 @@
+const { igdl } = require('btch-downloader');
 const axios = require('axios');
 const { MessageMedia } = require('whatsapp-web.js');
 
 module.exports = {
     name: 'ig',
-    description: 'Download video/reels/foto dari Instagram via Cobalt',
+    description: 'Download video/reels/foto dari Instagram (Multi-Server)',
     type: 'general', // Agar bisa dipakai di chat pribadi
     async execute(client, msg, args) {
         if (args.length === 0) {
             return msg.reply('❌ Masukkan link Instagram!\nContoh: *!ig https://www.instagram.com/reel/xxx*');
         }
 
-        const url = args[0];
+        // 1. BERSIHKAN LINK DARI KODE PELACAK
+        // Membuang semua karakter setelah tanda '?' agar scraping lebih mulus
+        let url = args[0].split('?')[0];
         
-        // Validasi dasar
         if (!url.includes('instagram.com')) {
             return msg.reply('❌ Link tidak valid! Pastikan itu adalah link resmi dari Instagram.');
         }
 
         await msg.react('⏳');
-        const loadingMsg = await msg.reply('🔍 Sedang mengambil media dari server pusat, harap tunggu sebentar...');
+        const loadingMsg = await msg.reply('🔍 Sedang mencoba mengunduh media, harap tunggu sebentar...');
 
         try {
-            // Memanggil API Publik Cobalt (Tanpa API Key, Sangat Stabil)
-            const response = await axios.post('https://co.wuk.sh/api/json', {
-                url: url
-            }, {
-                headers: {
-                    'Accept': 'application/json',
-                    'Content-Type': 'application/json'
-                }
-            });
-
-            const data = response.data;
-
-            // Jika Cobalt merespons error (misal karena akun target di-Private)
-            if (data.status === 'error') {
-                await loadingMsg.delete(true).catch(() => {});
-                return msg.reply('❌ Gagal mengunduh. Pastikan akun Instagram tersebut tidak di-Private/digembok.');
-            }
-
-            // Normalisasi data (Cobalt memisahkan output URL tunggal dan URL banyak/Carousel)
             let mediaUrls = [];
-            
-            if (data.url) {
-                // Jika hanya 1 video/foto
-                mediaUrls.push(data.url);
-            } else if (data.picker) {
-                // Jika isinya berupa slide/carousel (banyak foto/video)
-                mediaUrls = data.picker.map(item => item.url);
+
+            // ==========================================
+            // JALUR 1: Menggunakan btch-downloader lokal
+            // ==========================================
+            try {
+                const result = await igdl(url);
+                if (result && result.length > 0) {
+                    mediaUrls = result.map(item => item.url || item);
+                }
+            } catch (err1) {
+                console.log('Jalur 1 gagal, beralih ke Jalur 2...');
             }
 
+            // ==========================================
+            // JALUR 2: API Publik Siputzx
+            // ==========================================
+            if (mediaUrls.length === 0) {
+                try {
+                    const res = await axios.get(`https://api.siputzx.my.id/api/d/igdl?url=${url}`);
+                    if (res.data && res.data.data) {
+                        mediaUrls = res.data.data.map(item => item.url);
+                    }
+                } catch (err2) {
+                    console.log('Jalur 2 gagal, beralih ke Jalur 3...');
+                }
+            }
+            
+            // ==========================================
+            // JALUR 3: API Publik Ryzendesu
+            // ==========================================
+            if (mediaUrls.length === 0) {
+                try {
+                    const res = await axios.get(`https://api.ryzendesu.vip/api/downloader/igdl?url=${url}`);
+                    if (res.data && res.data.data) {
+                        if (Array.isArray(res.data.data)) {
+                             mediaUrls = res.data.data.map(item => item.url);
+                        } else {
+                             mediaUrls = [res.data.data.url || res.data.data];
+                        }
+                    }
+                } catch (err3) {
+                    console.log('Jalur 3 gagal...');
+                }
+            }
+
+            // ==========================================
+            // PROSES AKHIR: Eksekusi Kirim Media
+            // ==========================================
+            // Bersihkan url yang rusak (undefined/null)
+            mediaUrls = mediaUrls.filter(u => typeof u === 'string' && u.startsWith('http'));
+
+            // Jika dari ketiga jalur di atas tetap gagal
             if (mediaUrls.length === 0) {
                 await loadingMsg.delete(true).catch(() => {});
-                return msg.reply('❌ Media tidak ditemukan di dalam link tersebut.');
+                return msg.reply('❌ Media gagal diunduh. Instagram mungkin sedang memblokir akses bot secara global.');
             }
 
-            // Looping untuk mengirim semua media yang berhasil ditangkap
+            // Looping untuk mengirim media (Mendukung postingan IG slide/carousel)
             for (let i = 0; i < mediaUrls.length; i++) {
                 try {
                     const media = await MessageMedia.fromUrl(mediaUrls[i], { unsafeMime: true });
@@ -72,12 +98,9 @@ module.exports = {
             await msg.react('✅');
 
         } catch (error) {
-            console.error('Error IG Cobalt:', error.message);
+            console.error('Error IG Full:', error.message);
             await msg.react('❌');
-            
-            await loadingMsg.edit('❌ Terjadi kesalahan sistem. Server mungkin sedang kelebihan beban atau link ditolak oleh Instagram.').catch(() => {
-                msg.reply('❌ Terjadi kesalahan pada server saat mencoba mengunduh.');
-            });
+            await loadingMsg.edit('❌ Terjadi kesalahan sistem saat memproses link.').catch(() => {});
         }
     }
 };
