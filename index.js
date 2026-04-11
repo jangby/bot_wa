@@ -14,6 +14,7 @@ const premiumHandler = require('./utils/premiumHandler'); // Logika Limit & Prem
 // Deklarasi memori untuk fitur AFK dan Blacklist sementara
 global.afkMap = new Map();
 global.afkBlacklist = new Map();
+global.afkWarnings = new Map();
 
 // --- INISIALISASI KATA KASAR ---
 const kataKasar = ['anjing', 'babi', 'monyet', 'kunyuk', 'bajingan', 'tolol', 'goblok', 'bangsat', 'kontol', 'memek', 'jembut']; 
@@ -104,15 +105,22 @@ client.on('message_create', async (msg) => {
         // ==========================================
         // 👮‍♂️ 2. SATPAM AFK & BLACKLIST SEMENTARA
         // ==========================================
-        // Kita abaikan pesan dari bot itu sendiri agar tidak terjadi looping
         if (!msg.fromMe) {
             
-            // A. Cek Blacklist Sementara AFK (5 Menit)
+            // A. Cek Blacklist Sementara AFK (HUKUMAN: HAPUS PESAN AKTIF)
             if (global.afkBlacklist.has(senderId)) {
                 if (Date.now() < global.afkBlacklist.get(senderId)) {
-                    return; // ⛔ STOP PROSES (Pura-pura mati buat dia)
+                    // Sedang dalam masa hukuman -> HAPUS PESANNYA
+                    try {
+                        await msg.delete(true); 
+                    } catch (err) {
+                        console.log('Gagal hapus pesan AFK, pastikan Bot adalah Admin Grup!');
+                    }
+                    return; // ⛔ STOP PROSES
                 } else {
-                    global.afkBlacklist.delete(senderId); // Waktu habis, bebas!
+                    // Waktu habis tapi belum sempat terhapus oleh setTimeout (Fallback aman)
+                    global.afkBlacklist.delete(senderId); 
+                    global.afkWarnings.delete(senderId);
                 }
             }
 
@@ -126,6 +134,7 @@ client.on('message_create', async (msg) => {
             if (chat.isGroup) {
                 let taggedAfkUser = null;
 
+                // Deteksi Reply
                 if (msg.hasQuotedMsg) {
                     const quoted = await msg.getQuotedMessage();
                     const quotedId = quoted.author || quoted.from;
@@ -134,6 +143,7 @@ client.on('message_create', async (msg) => {
                     }
                 }
 
+                // Deteksi Tag/Mention (@)
                 if (!taggedAfkUser && msg.mentionedIds && msg.mentionedIds.length > 0) {
                     for (let id of msg.mentionedIds) {
                         if (global.afkMap.has(id)) {
@@ -143,11 +153,40 @@ client.on('message_create', async (msg) => {
                     }
                 }
 
-                // Jika terbukti melanggar
+                // Jika terbukti melanggar (Tag/Reply orang AFK)
                 if (taggedAfkUser && taggedAfkUser.id !== senderId) {
-                    // Masukkan ke blacklist 5 menit
-                    global.afkBlacklist.set(senderId, Date.now() + (5 * 60 * 1000));
-                    return msg.reply(`⚠️ *PERINGATAN SISTEM* ⚠️\n\nJangan tag atau balas pesan dia! Orang tersebut sedang AFK.\n*Alasan:* ${taggedAfkUser.data.reason}\n\n🚨 _HUKUMAN: Kamu di-blacklist. Bot tidak akan merespons pesanmu selama 5 menit!_`);
+                    
+                    // Ambil jumlah pelanggaran saat ini, tambah 1
+                    let currentWarnings = global.afkWarnings.get(senderId) || 0;
+                    currentWarnings += 1;
+                    global.afkWarnings.set(senderId, currentWarnings);
+
+                    const reason = taggedAfkUser.data.reason;
+
+                    // CEK APAKAH SUDAH MENCAPAI 3 KALI PELANGGARAN
+                    if (currentWarnings >= 3) {
+                        const banDuration = 5 * 60 * 1000; // 5 Menit
+
+                        // Masukkan ke blacklist
+                        global.afkBlacklist.set(senderId, Date.now() + banDuration);
+                        
+                        // Kirim pesan eksekusi hukuman
+                        await msg.reply(`🚨 *HUKUMAN SISTEM* 🚨\n\nKamu telah mengabaikan peringatan sebanyak 3 kali.\n\n_Semua pesan yang kamu kirim di grup ini akan otomatis dihapus oleh bot selama 5 menit ke depan!_`);
+
+                        // Buat timer otomatis untuk mengabari jika hukuman selesai
+                        setTimeout(async () => {
+                            global.afkBlacklist.delete(senderId);
+                            global.afkWarnings.delete(senderId); // Reset dosa jadi 0
+                            
+                            try {
+                                await client.sendMessage(chat.id._serialized, `✅ @${contact.id.user}, masa hukuman AFK-mu telah berakhir. Kamu sudah bisa mengirim pesan lagi dengan normal.`, { mentions: [senderId] });
+                            } catch (e) {}
+                        }, banDuration);
+
+                    } else {
+                        // Jika masih 1 atau 2 kali pelanggaran, beri peringatan
+                        return msg.reply(`⚠️ *PERINGATAN (${currentWarnings}/3)* ⚠️\n\nJangan tag atau balas pesan dia! Orang tersebut sedang AFK.\n*Alasan:* ${reason}\n\n_Peringatan ke-3 akan mengakibatkan pesanmu dibisukan otomatis selama 5 menit._`);
+                    }
                 }
             }
         }
