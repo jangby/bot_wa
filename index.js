@@ -98,29 +98,6 @@ client.on('message_create', async (msg) => {
         }
 
         // ==========================================
-        // 🆙 3. SISTEM LEVELING (XP & REAKSI)
-        // ==========================================
-        // Hanya jalan di Grup & Bukan pesan dari bot sendiri
-        if (chat.isGroup && !msg.fromMe) {
-            try {
-                // Tambah XP
-                const result = levelSystem.addXp(senderId);
-
-                // Reaksi Emoji Sesuai Level (Bungkus try-catch biar aman)
-                try { await msg.react(result.emoji); } catch (e) {}
-
-                // Cek Naik Level
-                if (result.leveledUp) {
-                    const role = levelSystem.getRole(result.level);
-                    // Quote pesan yg bikin naik level
-                    await msg.reply(`🎉 *LEVEL UP!* 🎉\n\nSelamat @${contact.id.user}, kamu naik ke *Level ${result.level}*!\nPangkat: *${role}*`, undefined, { mentions: [senderId] });
-                }
-            } catch (err) {
-                console.error('Level System Error:', err);
-            }
-        }
-
-        // ==========================================
         // 🛑 4. CEK BOT MATI (Maintenance Mode)
         // ==========================================
         if (!settings.bot_active && body.toLowerCase() !== '!on' && !isOwner) return;
