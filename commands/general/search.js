@@ -1,10 +1,9 @@
-// Tambahkan SafeSearchType di baris paling atas
-const { search, SafeSearchType } = require('duck-duck-scrape');
+const axios = require('axios');
 
 module.exports = {
     name: 'search',
-    description: 'Pencarian web cepat (Anti-Blokir)',
-    type: 'general',
+    description: 'Pencarian informasi ensiklopedia (Anti-Blokir)',
+    type: 'general', // Bisa diakses di PC maupun Grup
     async execute(client, msg, args) {
         if (args.length === 0) {
             return msg.reply('❌ Masukkan kata kunci pencarian!\nContoh: *!search candi borobudur*');
@@ -12,40 +11,57 @@ module.exports = {
 
         const query = args.join(' ');
         await msg.react('⏳');
-        const loadingMsg = await msg.reply('🔍 Sedang mencari informasi di internet...');
+        const loadingMsg = await msg.reply('🔍 Sedang menyusuri ensiklopedia internet...');
 
         try {
-            // PERBAIKAN DI SINI: Gunakan format resmi dari library
-            const searchResults = await search(query, {
-                safeSearch: SafeSearchType.OFF 
-            });
+            // ==========================================
+            // 1. CARI JUDUL ARTIKEL TERBAIK DI WIKIPEDIA
+            // ==========================================
+            const searchUrl = `https://id.wikipedia.org/w/api.php?action=opensearch&search=${encodeURIComponent(query)}&limit=1&namespace=0&format=json`;
+            const searchRes = await axios.get(searchUrl);
 
-            if (!searchResults.results || searchResults.results.length === 0) {
+            // Jika Wikipedia tidak punya datanya
+            if (!searchRes.data[1] || searchRes.data[1].length === 0) {
                 await loadingMsg.delete(true).catch(()=>{});
-                return msg.reply(`❌ Tidak ditemukan hasil untuk pencarian: *${query}*`);
+                return msg.reply(`❌ Tidak menemukan informasi pasti tentang *${query}*.\nCoba gunakan ejaan yang lebih baku/umum.`);
             }
 
-            let text = `🌐 *HASIL PENCARIAN WEB* 🌐\n\n`;
-            text += `*Topik:* ${query}\n\n`;
+            const title = searchRes.data[1][0]; // Judul Artikel
+            const link = searchRes.data[3][0];  // Link Artikel
 
-            const topResults = searchResults.results.slice(0, 3);
-            text += `📰 *Artikel Teratas:*\n`;
-            topResults.forEach((res, index) => {
-                text += `*${index + 1}. ${res.title}*\n`;
-                const cleanDescription = res.description.replace(/<\/?[^>]+(>|$)/g, "");
-                text += `${cleanDescription}\n`;
-                text += `🔗 ${res.url}\n\n`;
-            });
+            // ==========================================
+            // 2. AMBIL ISI PENJELASAN (RANGKUMAN)
+            // ==========================================
+            const detailUrl = `https://id.wikipedia.org/w/api.php?action=query&prop=extracts&exintro=true&explaintext=true&titles=${encodeURIComponent(title)}&format=json`;
+            const detailRes = await axios.get(detailUrl);
+            
+            const pages = detailRes.data.query.pages;
+            const pageId = Object.keys(pages)[0];
+            let extract = pages[pageId].extract;
 
+            // Batasi panjang teks agar tidak kepanjangan di layar WA (Maks 1500 karakter)
+            if (extract.length > 1500) {
+                extract = extract.substring(0, 1500) + '...\n\n_(Penjelasan dipotong karena terlalu panjang)_';
+            }
+
+            // ==========================================
+            // 3. SUSUN TEKS BALASAN
+            // ==========================================
+            let text = `🌐 *INFORMASI WIKIPEDIA* 🌐\n\n`;
+            text += `*Topik:* ${title}\n\n`;
+            text += `${extract}\n\n`;
+            text += `🔗 *Baca selengkapnya:* ${link}`;
+
+            // Kirim balasan
             await msg.reply(text);
 
             await loadingMsg.delete(true).catch(()=>{});
             await msg.react('✅');
 
         } catch (error) {
-            console.error('Error Web Search:', error.message);
+            console.error('Error Wikipedia API:', error.message);
             await msg.react('❌');
-            await loadingMsg.edit('❌ Terjadi kesalahan sistem saat mencoba mengambil data dari internet.').catch(()=>{});
+            await loadingMsg.edit('❌ Terjadi kesalahan sistem saat menghubungi server ensiklopedia.').catch(()=>{});
         }
     }
 };
