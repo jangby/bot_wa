@@ -3,7 +3,7 @@ const path = require('path');
 const { exec } = require('child_process');
 
 module.exports = {
-    name: 'tebak',
+    name: 'tebakfoto',
     description: 'Menebak umur, gender, ras, dan emosi dari foto wajah',
     type: 'general',
     async execute(client, msg, args) {
