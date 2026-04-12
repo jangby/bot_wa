@@ -1,48 +1,41 @@
+const axios = require('axios');
+const { MessageMedia } = require('whatsapp-web.js');
+
 module.exports = {
-    name: 'ai', // Nama perintah untuk dipanggil (!ai)
-    description: 'Tanya apa saja kepada AI (Llama 3)',
-    async execute(client, msg, args, { chat, contact }) {
-        // 1. Cek apakah user memasukkan pertanyaan
+    name: 'ai',
+    description: 'Membuat gambar unik dari teks Anda (gratis!)',
+    type: 'general', // Bisa dipakai di PC dan Grup
+    async execute(client, msg, args) {
         if (args.length === 0) {
-            return msg.reply('⚠️ Silakan masukkan pertanyaan!\n\n*Contoh:* !ai buatkan resep nasi goreng');
+            return msg.reply('❌ Masukkan teks deskripsi gambar yang ingin dibuat!\nContoh: *!ai a cute cat wearing a spacesuit in Mars, highly detailed*');
         }
 
-        // Gabungkan array args menjadi satu kalimat utuh
-        const pertanyaan = args.join(' ');
-
-        // 2. Beri reaksi atau pesan loading agar user tahu bot sedang berpikir
-        // Karena di VPS CPU mungkin butuh beberapa detik
-        await msg.react('⏳'); 
+        const prompt = args.join(' ');
+        await msg.react('⏳');
+        const loadingMsg = await msg.reply('Menggambar dari teks Anda, harap tunggu sebentar...');
 
         try {
-            // 3. Mengirim request ke API Lokal Ollama
-            const response = await fetch('http://localhost:11434/api/generate', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    model: 'qwen2.5:1.5b', // Pastikan nama model sesuai dengan yang kamu unduh (llama3)
-                    prompt: pertanyaan,
-                    stream: false // Kita set false agar jawaban dikumpulkan utuh dulu, baru dikirim ke WA
-                })
+            // Encode prompt agar bisa digunakan dalam URL
+            const encodedPrompt = encodeURIComponent(prompt);
+            
+            // Konstruk URL gambar (Gunakan parameter enhance untuk hasil lebih detail)
+            const imageUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}?enhance=true`;
+
+            // Unduh gambar dari Pollinations API
+            const media = await MessageMedia.fromUrl(imageUrl);
+            
+            // Kirim gambar ke WhatsApp
+            await client.sendMessage(msg.from, media, {
+                caption: `✅ *Hasil Gambar Selesai!*\n_Prompt: ${prompt}_`
             });
 
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-
-            const data = await response.json();
-            const jawabanAI = data.response;
-
-            // 4. Kirim balasan ke user dan ubah reaksi menjadi centang
-            await msg.reply(jawabanAI);
+            await loadingMsg.delete(true).catch(()=>{});
             await msg.react('✅');
 
         } catch (error) {
-            console.error('Error saat menghubungi Ollama:', error);
+            console.error('Error AI Image:', error.message);
             await msg.react('❌');
-            await msg.reply('Maaf, AI sedang mengalami gangguan atau server Ollama belum menyala.');
+            await loadingMsg.edit('❌ Terjadi kesalahan sistem saat mencoba menggambar.').catch(()=>{});
         }
     }
 };
