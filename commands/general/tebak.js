@@ -37,9 +37,13 @@ module.exports = {
 
             // 4. Panggil script Python melalui sistem Ubuntu
             const pythonScriptPath = path.join(__dirname, '../../utils/tebak_wajah.py');
+            
+            // Arahkan ke file python di dalam folder venv milik bot
+            // Asumsinya folder 'venv' ada di root direktori bot Anda
+            const pythonExecutable = path.join(__dirname, '../../venv/bin/python');
 
-            // Mengeksekusi Python3 di latar belakang Ubuntu
-            exec(`python3 "${pythonScriptPath}" "${tempFilename}"`, async (error, stdout, stderr) => {
+            // Mengeksekusi Python dari Venv di latar belakang Ubuntu
+            exec(`"${pythonExecutable}" "${pythonScriptPath}" "${tempFilename}"`, async (error, stdout, stderr) => {
                 
                 // Hapus gambar sementara segera setelah proses Python selesai (Mencegah storage VPS penuh)
                 if (fs.existsSync(tempFilename)) {
