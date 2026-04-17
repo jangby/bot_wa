@@ -5,7 +5,7 @@ const { MessageMedia } = require('whatsapp-web.js');
 
 module.exports = {
     name: 'juzperkata',
-    description: 'Buat dokumen .docx Terjemahan Per Kata satu Juz penuh (Multi bahasa: id/en)',
+    description: 'Buat dokumen .docx Terjemahan Per Kata (Format Horizontal Hemat Kertas)',
     type: 'general',
     async execute(client, msg, args) {
         if (args.length < 1) {
@@ -17,7 +17,6 @@ module.exports = {
             return msg.reply('❌ Nomor Juz harus berupa angka antara 1 sampai 30.');
         }
 
-        // Menentukan bahasa (default: id)
         let lang = 'id';
         if (args.length > 1 && (args[1].toLowerCase() === 'id' || args[1].toLowerCase() === 'en')) {
             lang = args[1].toLowerCase();
@@ -25,7 +24,7 @@ module.exports = {
 
         const langName = lang === 'id' ? 'Indonesia' : 'English';
 
-        const loadingMsg = await msg.reply(`⏳ Sedang menarik data dari server...\nMenyusun tabel Terjemahan Per Kata Juz ${juz} (${langName}).\n\n_(Proses ini memakan waktu beberapa detik karena menyusun ribuan kata ke dalam tabel Word)_`);
+        const loadingMsg = await msg.reply(`⏳ Sedang menyusun tabel Terjemahan Per Kata Juz ${juz} (${langName})...\n\n_(Menyusun format horizontal hemat kertas, mohon tunggu sebentar)_`);
         await msg.react('⏳');
 
         try {
@@ -33,7 +32,7 @@ module.exports = {
             let page = 1;
             let totalPages = 1;
 
-            // PERBAIKAN: Menambahkan &word_fields=text_uthmani agar teks Arab per-kata dikembalikan oleh API
+            // Mengambil data per-kata
             do {
                 const url = `https://api.quran.com/api/v4/verses/by_juz/${juz}?words=true&word_translation_language=${lang}&word_fields=text_uthmani&fields=text_uthmani&page=${page}&per_page=50`;
                 const res = await fetch(url);
@@ -53,20 +52,23 @@ module.exports = {
             // --- MULAI MENYUSUN DOKUMEN DOCX ---
             let docChildren = [];
 
-            // 1. Judul Dokumen
+            // Judul Dokumen
             docChildren.push(new Paragraph({
-                children: [new TextRun({ text: `Terjemahan Per Kata - Juz ${juz}`, bold: true, size: 36 })],
+                children: [new TextRun({ text: `Terjemahan Per Kata - Juz ${juz}`, bold: true, size: 32 })],
                 alignment: AlignmentType.CENTER,
-                spacing: { after: 200 }
+                spacing: { after: 100 }
             }));
 
             docChildren.push(new Paragraph({
-                children: [new TextRun({ text: `Bahasa: ${langName}`, size: 28 })],
+                children: [new TextRun({ text: `Bahasa: ${langName}`, size: 24 })],
                 alignment: AlignmentType.CENTER,
-                spacing: { after: 600 }
+                spacing: { after: 400 }
             }));
 
-            // 2. Looping per ayat
+            // Setting jumlah kolom kata per baris (6 kolom adalah ukuran paling ideal untuk kertas A4)
+            const colsPerLine = 6; 
+
+            // Looping per ayat
             for (const arab of allVerses) {
                 
                 // Header Penanda Ayat
@@ -75,76 +77,83 @@ module.exports = {
                         new TextRun({ 
                             text: `Surah & Ayat: ${arab.verse_key}`, 
                             bold: true, 
-                            size: 24, // 12pt
+                            size: 20, // 10pt agar lebih hemat tempat
                             color: "2E74B5" 
                         })
                     ],
-                    spacing: { before: 400, after: 150 }
+                    spacing: { before: 200, after: 100 }
                 }));
 
-                // Ayat Utuh (Rata Kanan) sebelum per kata
+                // Ayat Utuh (Rata Kanan)
                 docChildren.push(new Paragraph({
                     children: [
                         new TextRun({ 
                             text: arab.text_uthmani, 
-                            size: 32 // 16pt 
+                            size: 28 // 14pt
                         })
                     ],
                     alignment: AlignmentType.RIGHT,
-                    spacing: { after: 200 }
+                    spacing: { after: 150 }
                 }));
 
-                // 3. Menyusun Tabel Per Kata untuk ayat ini
+                // Ambil semua kata kecuali tanda akhir ayat
+                const words = arab.words.filter(w => w.char_type_name !== 'end');
+                
                 let tableRows = [];
 
-                // Header Tabel
-                tableRows.push(new TableRow({
-                    children: [
-                        new TableCell({
-                            width: { size: 50, type: WidthType.PERCENTAGE },
-                            children: [new Paragraph({ children: [new TextRun({ text: "Teks Arab", bold: true, size: 24 })], alignment: AlignmentType.CENTER })],
-                        }),
-                        new TableCell({
-                            width: { size: 50, type: WidthType.PERCENTAGE },
-                            children: [new Paragraph({ children: [new TextRun({ text: `Arti (${langName})`, bold: true, size: 24 })], alignment: AlignmentType.CENTER })],
-                        }),
-                    ],
-                }));
+                // Pecah susunan kata menjadi potongan-potongan (chunks) sesuai colsPerLine
+                for (let i = 0; i < words.length; i += colsPerLine) {
+                    const chunk = words.slice(i, i + colsPerLine);
+                    
+                    // MEMBALIK URUTAN ARRAY (REVERSE)
+                    // Karena bahasa Arab dibaca dari kanan, kata pertama harus diletakkan di kolom paling kanan.
+                    const displayChunk = [...chunk].reverse();
+                    
+                    let arabicCells = [];
+                    let transCells = [];
 
-                // Looping Kata di dalam Ayat
-                if (arab.words && arab.words.length > 0) {
-                    for (const word of arab.words) {
-                        // Abaikan tanda akhir ayat (nomor ayat di ujung)
-                        if (word.char_type_name === 'end') continue;
+                    // Jika sisa kata kurang dari target kolom (misal sisa 2 kata di baris terakhir), 
+                    // tambahkan sel kosong di kiri agar teks Arab tetap rata kanan.
+                    const emptyCount = colsPerLine - displayChunk.length;
+                    for(let e = 0; e < emptyCount; e++) {
+                        arabicCells.push(new TableCell({ children: [], width: { size: 100 / colsPerLine, type: WidthType.PERCENTAGE } }));
+                        transCells.push(new TableCell({ children: [], width: { size: 100 / colsPerLine, type: WidthType.PERCENTAGE } }));
+                    }
 
-                        // PERBAIKAN: Mengambil teks arab dari word.text_uthmani (yang sekarang sudah ada karena param API)
+                    // Masukkan kata ke dalam sel
+                    for (const word of displayChunk) {
                         const arabicText = word.text_uthmani || '-';
                         const translationText = (word.translation && word.translation.text) ? word.translation.text : '-';
 
-                        tableRows.push(new TableRow({
-                            children: [
-                                new TableCell({
-                                    width: { size: 50, type: WidthType.PERCENTAGE },
-                                    children: [new Paragraph({ 
-                                        children: [new TextRun({ text: arabicText, size: 32 })], 
-                                        alignment: AlignmentType.CENTER 
-                                    })],
-                                    verticalAlign: "center"
-                                }),
-                                new TableCell({
-                                    width: { size: 50, type: WidthType.PERCENTAGE },
-                                    children: [new Paragraph({ 
-                                        children: [new TextRun({ text: translationText, size: 24 })], 
-                                        alignment: AlignmentType.CENTER 
-                                    })],
-                                    verticalAlign: "center"
-                                }),
-                            ],
+                        // Sel untuk baris Arab (Baris 1)
+                        arabicCells.push(new TableCell({
+                            children: [new Paragraph({ 
+                                children: [new TextRun({ text: arabicText, size: 28 /* 14pt */ })], 
+                                alignment: AlignmentType.CENTER 
+                            })],
+                            width: { size: 100 / colsPerLine, type: WidthType.PERCENTAGE },
+                            verticalAlign: "center",
+                            margins: { top: 100, bottom: 50, left: 50, right: 50 }
+                        }));
+
+                        // Sel untuk baris Terjemahan (Baris 2)
+                        transCells.push(new TableCell({
+                            children: [new Paragraph({ 
+                                children: [new TextRun({ text: translationText, size: 20 /* 10pt */ })], 
+                                alignment: AlignmentType.CENTER 
+                            })],
+                            width: { size: 100 / colsPerLine, type: WidthType.PERCENTAGE },
+                            verticalAlign: "center",
+                            margins: { top: 50, bottom: 100, left: 50, right: 50 }
                         }));
                     }
+
+                    // Gabungkan baris Arab di atas, Terjemahan tepat di bawahnya
+                    tableRows.push(new TableRow({ children: arabicCells }));
+                    tableRows.push(new TableRow({ children: transCells }));
                 }
 
-                // Masukkan tabel ke dalam dokumen
+                // Masukkan tabel susunan kata ini ke dokumen
                 const wordTable = new Table({
                     rows: tableRows,
                     width: { size: 100, type: WidthType.PERCENTAGE },
@@ -159,9 +168,12 @@ module.exports = {
                 });
 
                 docChildren.push(wordTable);
+                
+                // Tambahkan spasi antar ayat
+                docChildren.push(new Paragraph({ text: "", spacing: { after: 100 } }));
             }
 
-            // 4. Buat file Document Word
+            // Buat file Document Word
             const doc = new Document({
                 sections: [{
                     properties: {},
@@ -169,20 +181,19 @@ module.exports = {
                 }],
             });
 
-            // 5. Proses render ke file lokal server
-            const fileName = `Juz_${juz}_PerKata_${lang.toUpperCase()}_${Date.now()}.docx`;
+            // Proses render ke file
+            const fileName = `Juz_${juz}_PerKata_Cetak_${lang.toUpperCase()}_${Date.now()}.docx`;
             const filePath = path.join(__dirname, '../../', fileName);
 
             const buffer = await Packer.toBuffer(doc);
             fs.writeFileSync(filePath, buffer);
 
-            // 6. Kirim file DOCX ke WhatsApp
+            // Kirim file DOCX ke WhatsApp
             const media = MessageMedia.fromFilePath(filePath);
             await client.sendMessage(msg.from, media, {
-                caption: `✅ *Dokumen Per-Kata Selesai!*\n\nBerikut adalah tabel **Terjemahan Per Kata Juz ${juz}** (${langName}).\nTeks telah disusun rapi ke dalam format tabel agar mudah dipelajari.\n\nSumber: _Quran.com API_`
+                caption: `✅ *Dokumen Hemat Kertas Selesai!*\n\nBerikut adalah tabel **Terjemahan Per Kata Juz ${juz}**.\n\nFormat telah diubah menjadi menyamping (horizontal) dengan **6 kata per baris**, sangat efisien dan cocok untuk di-print.\n_Cara baca: Kolom dibaca dari Kanan ke Kiri._`
             });
 
-            // Bersihkan pesan loading & hapus file sementara dari RAM server
             await loadingMsg.delete(true).catch(()=>{});
             await msg.react('✅');
             if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
@@ -190,7 +201,7 @@ module.exports = {
         } catch (error) {
             console.error('Error buat docx perkata juz:', error);
             await msg.react('❌');
-            await loadingMsg.edit('❌ Terjadi kesalahan saat memproses data/membuat tabel dokumen.').catch(()=>{});
+            await loadingMsg.edit('❌ Terjadi kesalahan saat memproses tabel dinamis dokumen.').catch(()=>{});
         }
     }
 };
