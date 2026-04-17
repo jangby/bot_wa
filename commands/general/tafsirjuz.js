@@ -68,8 +68,8 @@ module.exports = {
             for (let i = 0; i < ayahsArabic.length; i++) {
                 const arab = ayahsArabic[i];
                 
-                // Pencocokan data secara aman menggunakan "verse_key" (Format: "NomorSurah:NomorAyat", contoh "78:1")
-                const tafsirData = ayahsTafsir.find(t => t.verse_key === arab.verse_key);
+                // PERBAIKAN: Gunakan verse_id (nomor unik id ayat) agar datanya langsung cocok
+                const tafsirData = ayahsTafsir.find(t => t.verse_id === arab.id);
                 
                 // Menghilangkan tag HTML (<br>, <b>, dsb) bawaan dari API Quran.com agar rapi di Word
                 let tafsirText = "Tafsir tidak tersedia untuk ayat ini.";
@@ -140,7 +140,7 @@ module.exports = {
                 caption: `✅ *Dokumen Tafsir Selesai!*\n\nBerikut adalah **Tafsir Juz ${juz}** lengkap.\nBerisi total ${ayahsArabic.length} ayat berserta penjabaran tafsirnya.\n\nSumber: _Quran.com API_`
             });
 
-            // Bersihkan pesan loading & hapus file sementara dari RAM server
+            // Bersihkan pesan loading & hapus file sementara
             await loadingMsg.delete(true).catch(()=>{});
             await msg.react('✅');
             if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
