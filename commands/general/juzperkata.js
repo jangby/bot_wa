@@ -33,9 +33,9 @@ module.exports = {
             let page = 1;
             let totalPages = 1;
 
-            // Mengambil data per-kata (words=true) menggunakan pagination
+            // PERBAIKAN: Menambahkan &word_fields=text_uthmani agar teks Arab per-kata dikembalikan oleh API
             do {
-                const url = `https://api.quran.com/api/v4/verses/by_juz/${juz}?words=true&word_translation_language=${lang}&fields=text_uthmani&page=${page}&per_page=50`;
+                const url = `https://api.quran.com/api/v4/verses/by_juz/${juz}?words=true&word_translation_language=${lang}&word_fields=text_uthmani&fields=text_uthmani&page=${page}&per_page=50`;
                 const res = await fetch(url);
                 const json = await res.json();
                 
@@ -117,6 +117,7 @@ module.exports = {
                         // Abaikan tanda akhir ayat (nomor ayat di ujung)
                         if (word.char_type_name === 'end') continue;
 
+                        // PERBAIKAN: Mengambil teks arab dari word.text_uthmani (yang sekarang sudah ada karena param API)
                         const arabicText = word.text_uthmani || '-';
                         const translationText = (word.translation && word.translation.text) ? word.translation.text : '-';
 
