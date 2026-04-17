@@ -26,7 +26,7 @@ module.exports = {
         const tafsirId = lang === 'id' ? '169' : '168';
         const langName = lang === 'id' ? 'Indonesia (Kemenag)' : 'English (Ibn Kathir)';
 
-        const loadingMsg = await msg.reply(`⏳ Sedang menarik data dari server dan menyusun dokumen Tafsir Juz ${juz}...\nKitab: *${langName}*\nMohon tunggu, proses ini butuh waktu beberapa detik karena mengambil ratusan ayat.`);
+        const loadingMsg = await msg.reply(`⏳ Sedang menyusun dokumen Tafsir Juz ${juz}...\nKitab: *${langName}*\n\n_(Mohon tunggu sebentar, bot sedang mengambil data tafsir per-ayat. Ini akan memakan waktu sekitar 15-30 detik)_`);
         await msg.react('⏳');
 
         try {
@@ -34,27 +34,28 @@ module.exports = {
             let page = 1;
             let totalPages = 1;
 
-            // Mengambil data menggunakan halaman (pagination) agar API tidak menolak request yang terlalu besar
+            // 1. Mengambil semua ayat Arab di Juz tersebut
             do {
-                const url = `https://api.quran.com/api/v4/verses/by_juz/${juz}?language=${lang}&words=false&translations=${tafsirId}&fields=text_uthmani&page=${page}&per_page=50`;
-                const res = await fetch(url);
+                const res = await fetch(`https://api.quran.com/api/v4/verses/by_juz/${juz}?words=false&fields=text_uthmani&page=${page}&per_page=50`);
                 const json = await res.json();
                 
-                if (!json.verses) break;
-                
-                allVerses = allVerses.concat(json.verses);
-                totalPages = json.pagination.total_pages;
+                if (json.verses) {
+                    allVerses = allVerses.concat(json.verses);
+                    totalPages = json.pagination.total_pages;
+                } else {
+                    break;
+                }
                 page++;
             } while (page <= totalPages);
 
             if (allVerses.length === 0) {
-                return loadingMsg.edit('❌ Gagal mengambil data tafsir dari server Quran.com.').catch(()=>{});
+                return loadingMsg.edit('❌ Gagal mengambil data ayat dari server Quran.com.').catch(()=>{});
             }
 
             // --- MULAI MENYUSUN DOKUMEN DOCX ---
             let docChildren = [];
 
-            // 1. Judul Dokumen
+            // Judul Dokumen
             docChildren.push(new Paragraph({
                 children: [new TextRun({ text: `Tafsir Al-Quran - Juz ${juz}`, bold: true, size: 36 })],
                 alignment: AlignmentType.CENTER,
@@ -67,18 +68,25 @@ module.exports = {
                 spacing: { after: 600 }
             }));
 
-            // 2. Looping menyusun Ayat Arab -> Tafsir
+            // 2. Looping per ayat untuk mengambil teks Tafsir secara spesifik
             for (const arab of allVerses) {
                 let tafsirText = "Tafsir tidak tersedia untuk ayat ini.";
                 
-                // Ambil data tafsir yang menempel pada objek terjemahan dari API
-                if (arab.translations && arab.translations.length > 0 && arab.translations[0].text) {
-                    tafsirText = arab.translations[0].text
-                        .replace(/<[^>]+>/g, '')       // Hapus sisa tag HTML seperti <p> atau <b>
-                        .replace(/&quot;/g, '"')       // Bersihkan simbol quote
-                        .replace(/&nbsp;/g, ' ')       // Bersihkan simbol spasi HTML
-                        .replace(/\n\s*\n/g, '\n\n')   // Rapikan enter yang kelebihan
-                        .trim();
+                try {
+                    // Menggunakan endpoint khusus Tafsir By Ayah (Sangat Akurat)
+                    const tafsirRes = await fetch(`https://api.quran.com/api/v4/tafsirs/${tafsirId}/by_ayah/${arab.verse_key}`);
+                    const tafsirJson = await tafsirRes.json();
+
+                    if (tafsirJson && tafsirJson.tafsir && tafsirJson.tafsir.text) {
+                        tafsirText = tafsirJson.tafsir.text
+                            .replace(/<[^>]+>/g, '')       // Hapus tag HTML
+                            .replace(/&quot;/g, '"')       // Bersihkan simbol quote
+                            .replace(/&nbsp;/g, ' ')       // Bersihkan simbol spasi
+                            .replace(/\n\s*\n/g, '\n\n')   // Rapikan enter
+                            .trim();
+                    }
+                } catch (err) {
+                    console.error(`Gagal mengambil tafsir untuk ayat ${arab.verse_key}`);
                 }
 
                 // Header Penanda Ayat
@@ -99,7 +107,7 @@ module.exports = {
                     children: [
                         new TextRun({ 
                             text: arab.text_uthmani, 
-                            size: 32 // 16pt agar Arab mudah dibaca
+                            size: 32 // 16pt
                         })
                     ],
                     alignment: AlignmentType.RIGHT,
@@ -116,7 +124,7 @@ module.exports = {
                         })
                     ],
                     alignment: AlignmentType.JUSTIFIED,
-                    spacing: { after: 400 } // Spasi bawah lebih jauh untuk pemisah antar ayat
+                    spacing: { after: 400 } 
                 }));
             }
 
@@ -138,7 +146,7 @@ module.exports = {
             // 5. Kirim file DOCX ke WhatsApp Anda
             const media = MessageMedia.fromFilePath(filePath);
             await client.sendMessage(msg.from, media, {
-                caption: `✅ *Dokumen Tafsir Selesai!*\n\nBerikut adalah **Tafsir Juz ${juz}** lengkap.\nBerisi total ${allVerses.length} ayat berserta penjabaran tafsirnya.\n\nSumber: _Quran.com API_`
+                caption: `✅ *Dokumen Tafsir Selesai!*\n\nBerikut adalah **Tafsir Juz ${juz}** lengkap.\nBerisi total ${allVerses.length} ayat berserta penjabaran tafsirnya yang telah dimuat satu per satu dengan akurat.\n\nSumber: _Quran.com API_`
             });
 
             // Bersihkan pesan loading & hapus file sementara dari RAM server
