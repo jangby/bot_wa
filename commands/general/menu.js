@@ -157,6 +157,7 @@ module.exports = {
 • *!addjadwal* - Menambah jadwal sistem
 • *!addpremium* - Beri akses premium ke user
 • *!addsaldo* - Suntik saldo ke akun member
+• *!addmodal* - Bagikan saldo ke seluruh member grup
 • *!fitur* - Manajemen dan pengaturan status fitur
 • *!off* - Matikan bot (Sleep mode)
 • *!on* - Nyalakan bot (Wake up mode)
