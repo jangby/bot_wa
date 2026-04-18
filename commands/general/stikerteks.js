@@ -8,66 +8,60 @@ module.exports = {
     type: 'general',
     async execute(client, msg, args) {
         if (args.length === 0) {
-            return msg.reply('❌ Masukkan teksnya! Contoh: *!stikerteks Halo apa kabar*');
+            return msg.reply('❌ Masukkan teksnya! Contoh: *!stikerteks Halo semuanya selamat pagi*');
         }
 
         try {
-            await msg.react('⏳'); // Indikator loading
+            await msg.react('⏳');
 
             const text = args.join(' ');
             const words = text.split(' ');
             
-            // Siapkan kanvas berukuran 512x512 (ukuran ideal stiker WA)
             const width = 512;
             const height = 512;
             const canvas = createCanvas(width, height);
             const ctx = canvas.getContext('2d');
             
-            // Inisialisasi pembuat GIF
             const encoder = new GIFEncoder(width, height);
             encoder.start();
-            encoder.setRepeat(0);   // 0 untuk loop terus-menerus
-            encoder.setDelay(500);  // Jeda tiap kata (500ms atau setengah detik)
+            encoder.setRepeat(0);   
+            encoder.setDelay(500);  // Jeda munculnya tiap kata (500 milidetik)
             encoder.setQuality(10); 
 
             let currentText = '';
 
-            // Looping untuk membuat frame demi frame
             for (let i = 0; i < words.length; i++) {
-                // Tambahkan kata baru ke kalimat yang sedang dibuat
                 currentText += (i === 0 ? '' : ' ') + words[i];
 
-                // Render background
-                ctx.fillStyle = '#ffffff'; // Warna background (putih)
+                // Background putih
+                ctx.fillStyle = '#ffffff';
                 ctx.fillRect(0, 0, width, height);
 
-                // Render Teks
+                // Teks hitam
                 ctx.font = 'bold 40px Arial';
-                ctx.fillStyle = '#000000'; // Warna teks (hitam)
+                ctx.fillStyle = '#000000';
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'middle';
                 
-                // Fitur word wrap sederhana bisa ditambahkan di sini jika kalimat panjang
+                // Tambahkan teks ke tengah kanvas
                 ctx.fillText(currentText, width / 2, height / 2);
 
-                // Masukkan gambar ini sebagai 1 frame ke dalam GIF
                 encoder.addFrame(ctx);
             }
 
-            // Tambahkan frame terakhir dengan jeda lebih lama agar teks utuh terbaca
+            // Frame terakhir dijeda 2 detik agar bisa dibaca utuh
             encoder.setDelay(2000); 
             encoder.addFrame(ctx);
 
             encoder.finish();
             const buffer = encoder.out.getData();
 
-            // Ubah buffer hasil GIF menjadi MessageMedia
-            const media = new MessageMedia('image/gif', buffer.toString('base64'), 'stiker.gif');
+            // TRICK: Gunakan video/mp4 agar whatsapp-web.js memprosesnya sebagai stiker animasi (via ffmpeg)
+            const media = new MessageMedia('video/mp4', buffer.toString('base64'), 'stiker.mp4');
 
-            // Kirim langsung sebagai stiker animasi
             await client.sendMessage(msg.from, media, { 
                 sendMediaAsSticker: true, 
-                stickerName: 'Teks Video', 
+                stickerName: 'Teks Animasi', 
                 stickerAuthor: 'Bot WA' 
             });
 
