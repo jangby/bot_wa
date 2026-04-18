@@ -421,16 +421,6 @@ client.on('message_create', async (msg) => {
             return msg.reply('⚠️ Fitur ini sedang dimatikan Owner.');
         }
 
-        // ==========================================
-        // 🛑 SISTEM LIMIT & PREMIUM (PERBAIKAN)
-        // ==========================================
-        // Command yang GRATIS (Tidak kurangi limit)
-        const freeCommands = ['menu', 'daftarpremium', 'owner', 'ceklimit', 'topup', 'addpremium', 'on', 'off', 'daftar', 'help'];
-        
-        if (!freeCommands.includes(commandName)) {
-            const canProceed = await premiumHandler.checkLimit(client, msg, commandName, senderId, isOwner);
-            if (!canProceed) return; 
-        }
 
         // ==========================================
 

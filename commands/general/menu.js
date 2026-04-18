@@ -134,7 +134,6 @@ module.exports = {
 • *!tebakgambar* - Game logika tebak gambar
 • *!toko* - Buka katalog toko game
 • *!ttt* - Game Tic-Tac-Toe (XOXO)
-• *!ww* - Game Werewolf komprehensif grup
 
 *🥳 FUN & INTERAKSI SOSIAL*
 • *!bukakapsul* - Buka kapsul waktu yang tersimpan
