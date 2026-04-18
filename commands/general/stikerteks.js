@@ -4,38 +4,33 @@ const { MessageMedia } = require('whatsapp-web.js');
 const fs = require('fs');
 const ffmpeg = require('fluent-ffmpeg');
 
-// Fungsi tambahan agar teks otomatis turun ke bawah (word wrap) jika panjang
-function wrapText(ctx, text, x, y, maxWidth, lineHeight) {
-    const words = text.split(' ');
-    let line = '';
+// Fungsi pembantu untuk memecah teks menjadi beberapa baris agar tidak keluar jalur
+function getLines(ctx, text, maxWidth) {
+    if (!text) return [];
+    let words = text.split(' ');
     let lines = [];
+    let currentLine = words[0];
 
-    for(let n = 0; n < words.length; n++) {
-        let testLine = line + words[n] + ' ';
-        let metrics = ctx.measureText(testLine);
-        if (metrics.width > maxWidth && n > 0) {
-            lines.push(line);
-            line = words[n] + ' ';
+    for (let i = 1; i < words.length; i++) {
+        let testLine = currentLine + ' ' + words[i];
+        if (ctx.measureText(testLine).width > maxWidth) {
+            lines.push(currentLine);
+            currentLine = words[i];
         } else {
-            line = testLine;
+            currentLine = testLine;
         }
     }
-    lines.push(line);
-    
-    // Hitung posisi Y agar kumpulan teks tetap berada di tengah secara vertikal
-    let startY = y - ((lines.length - 1) * lineHeight) / 2;
-    for(let i = 0; i < lines.length; i++) {
-        ctx.fillText(lines[i].trim(), x, startY + (i * lineHeight));
-    }
+    lines.push(currentLine);
+    return lines;
 }
 
 module.exports = {
     name: 'stikerteks',
-    description: 'Buat stiker teks animasi berurutan',
+    description: 'Buat stiker teks animasi dengan auto-size font',
     type: 'general',
     async execute(client, msg, args) {
         if (args.length === 0) {
-            return msg.reply('❌ Masukkan teksnya!\nContoh: *!stikerteks Halo semuanya selamat pagi*');
+            return msg.reply('❌ Masukkan teksnya!\nContoh: *!stikerteks Halo kawan-kawan semuanya apa kabar*');
         }
 
         try {
@@ -49,32 +44,87 @@ module.exports = {
             const canvas = createCanvas(width, height);
             const ctx = canvas.getContext('2d');
             
+            // Beri jarak (margin) 40px di setiap sisi agar teks tidak terlalu mepet layar
+            const padding = 40;
+            const maxWidth = width - (padding * 2);
+            const maxHeight = height - (padding * 2);
+            
+            // ==========================================
+            // 1. ALGORITMA DYNAMIC FONT SIZE (AUTO-SIZE)
+            // ==========================================
+            let fontSize = 120; // Mulai dari ukuran raksasa
+            let lineHeight = 0;
+            let fullTextLines = [];
+            
+            // Loop untuk mengecilkan font sampai teks muat di dalam layar
+            while (fontSize > 20) {
+                ctx.font = `bold ${fontSize}px Arial`;
+                lineHeight = fontSize * 1.2; 
+                
+                // Cek apakah ada 1 kata tunggal yang kepanjangan melebihi layar
+                let wordTooLong = false;
+                for (let w of words) {
+                    if (ctx.measureText(w).width > maxWidth) {
+                        wordTooLong = true;
+                        break;
+                    }
+                }
+                
+                // Jika ada kata yang kepanjangan, langsung kecilkan font 5px
+                if (wordTooLong) {
+                    fontSize -= 5;
+                    continue;
+                }
+                
+                // Cek apakah total tinggi baris melebihi layar
+                fullTextLines = getLines(ctx, text, maxWidth);
+                let totalHeight = fullTextLines.length * lineHeight;
+                
+                // Jika tinggi teks sudah muat di layar, hentikan pencarian font
+                if (totalHeight <= maxHeight) {
+                    break; 
+                }
+                fontSize -= 5;
+            }
+            
+            // Kunci posisi Y (Tinggi) agar animasi teks muncul stabil di tengah kanvas
+            let totalFullHeight = fullTextLines.length * lineHeight;
+            let startY = (height - totalFullHeight) / 2 + (lineHeight / 2);
+
+            // ==========================================
+            // 2. PEMBUATAN FRAME DEMI FRAME
+            // ==========================================
             const encoder = new GIFEncoder(width, height);
             encoder.start();
             encoder.setRepeat(0);   
-            encoder.setDelay(500);  
+            encoder.setDelay(500);  // Jeda tiap kata (500ms)
             encoder.setQuality(10); 
 
-            let currentText = '';
-
-            for (let i = 0; i < words.length; i++) {
-                currentText += (i === 0 ? '' : ' ') + words[i];
-
-                ctx.fillStyle = '#ffffff';
+            // Render gambar sesuai dengan urutan bertambahnya kata
+            for (let i = 1; i <= words.length; i++) {
+                // Potong kata dari awal sampai urutan ke-i
+                let currentSubset = words.slice(0, i).join(' ');
+                
+                ctx.fillStyle = '#ffffff'; // Warna Background
                 ctx.fillRect(0, 0, width, height);
 
-                // Ukuran font diperbesar menjadi 70px
-                ctx.font = 'bold 70px Arial';
-                ctx.fillStyle = '#000000';
+                ctx.font = `bold ${fontSize}px Arial`;
+                ctx.fillStyle = '#000000'; // Warna Teks
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'middle';
                 
-                // Gunakan fungsi wrapText, beri margin 40px di kiri & kanan (maksimal lebar 430px)
-                wrapText(ctx, currentText, width / 2, height / 2, 430, 80);
+                // Susun teks yang sudah dipotong tadi
+                let subsetLines = getLines(ctx, currentSubset, maxWidth);
+
+                // Gambar ke layar sesuai posisi barisnya
+                for (let j = 0; j < subsetLines.length; j++) {
+                    ctx.fillText(subsetLines[j], width / 2, startY + (j * lineHeight));
+                }
 
                 encoder.addFrame(ctx);
             }
 
+            // Frame terakhir dijeda 2 detik (2000ms)
             encoder.setDelay(2000); 
             encoder.addFrame(ctx);
 
@@ -83,17 +133,20 @@ module.exports = {
 
             const time = Date.now();
             const tempGifPath = `./temp_stiker_${time}.gif`;
-            
-            // KUNCI PERUBAHAN: Ubah output menjadi WebP (Format asli stiker WA)
             const tempWebpPath = `./temp_stiker_${time}.webp`; 
             
             fs.writeFileSync(tempGifPath, buffer);
 
-            // Konversi GIF langsung ke WebP dengan parameter loop
+            // ==========================================
+            // 3. RENDER KE WEBP KHUSUS WHATSAPP (FIX LOOPING)
+            // ==========================================
             ffmpeg(tempGifPath)
                 .outputOptions([
                     '-vcodec libwebp',
-                    '-loop 0',          // Parameter ini memaksa stiker berulang (loop) terus menerus
+                    '-vf scale=512:512',
+                    '-filter:v fps=fps=15', // Kunci framerate agar loop stabil di WA
+                    '-lossless 1',
+                    '-loop 0',              // Paksa loop tanpa batas
                     '-preset default',
                     '-an',
                     '-vsync 0'
@@ -114,6 +167,7 @@ module.exports = {
                         console.error('Error saat kirim:', sendErr);
                         msg.reply('❌ Gagal mengirim hasil stiker teks.');
                     } finally {
+                        // Bersihkan cache file sementara
                         if (fs.existsSync(tempGifPath)) fs.unlinkSync(tempGifPath);
                         if (fs.existsSync(tempWebpPath)) fs.unlinkSync(tempWebpPath);
                     }
