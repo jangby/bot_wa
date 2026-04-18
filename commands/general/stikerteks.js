@@ -4,6 +4,31 @@ const { MessageMedia } = require('whatsapp-web.js');
 const fs = require('fs');
 const ffmpeg = require('fluent-ffmpeg');
 
+// Fungsi tambahan agar teks otomatis turun ke bawah (word wrap) jika panjang
+function wrapText(ctx, text, x, y, maxWidth, lineHeight) {
+    const words = text.split(' ');
+    let line = '';
+    let lines = [];
+
+    for(let n = 0; n < words.length; n++) {
+        let testLine = line + words[n] + ' ';
+        let metrics = ctx.measureText(testLine);
+        if (metrics.width > maxWidth && n > 0) {
+            lines.push(line);
+            line = words[n] + ' ';
+        } else {
+            line = testLine;
+        }
+    }
+    lines.push(line);
+    
+    // Hitung posisi Y agar kumpulan teks tetap berada di tengah secara vertikal
+    let startY = y - ((lines.length - 1) * lineHeight) / 2;
+    for(let i = 0; i < lines.length; i++) {
+        ctx.fillText(lines[i].trim(), x, startY + (i * lineHeight));
+    }
+}
+
 module.exports = {
     name: 'stikerteks',
     description: 'Buat stiker teks animasi berurutan',
@@ -38,12 +63,14 @@ module.exports = {
                 ctx.fillStyle = '#ffffff';
                 ctx.fillRect(0, 0, width, height);
 
-                ctx.font = 'bold 40px Arial';
+                // Ukuran font diperbesar menjadi 70px
+                ctx.font = 'bold 70px Arial';
                 ctx.fillStyle = '#000000';
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'middle';
                 
-                ctx.fillText(currentText, width / 2, height / 2);
+                // Gunakan fungsi wrapText, beri margin 40px di kiri & kanan (maksimal lebar 430px)
+                wrapText(ctx, currentText, width / 2, height / 2, 430, 80);
 
                 encoder.addFrame(ctx);
             }
@@ -54,26 +81,27 @@ module.exports = {
             encoder.finish();
             const buffer = encoder.out.getData();
 
-            // 1. Simpan GIF ke file sementara yang unik (pakai Date.now agar tidak bentrok)
             const time = Date.now();
             const tempGifPath = `./temp_stiker_${time}.gif`;
-            const tempMp4Path = `./temp_stiker_${time}.mp4`;
+            
+            // KUNCI PERUBAHAN: Ubah output menjadi WebP (Format asli stiker WA)
+            const tempWebpPath = `./temp_stiker_${time}.webp`; 
             
             fs.writeFileSync(tempGifPath, buffer);
 
-            // 2. Konversi GIF ke MP4 Asli menggunakan FFMPEG
+            // Konversi GIF langsung ke WebP dengan parameter loop
             ffmpeg(tempGifPath)
                 .outputOptions([
-                    '-pix_fmt yuv420p',
-                    '-c:v libx264',
-                    '-movflags +faststart',
-                    '-filter:v crop=trunc(iw/2)*2:trunc(ih/2)*2' // Wajib untuk MP4 (dimensi harus genap)
+                    '-vcodec libwebp',
+                    '-loop 0',          // Parameter ini memaksa stiker berulang (loop) terus menerus
+                    '-preset default',
+                    '-an',
+                    '-vsync 0'
                 ])
-                .save(tempMp4Path)
+                .save(tempWebpPath)
                 .on('end', async () => {
                     try {
-                        // 3. Setelah sukses jadi MP4, baca file tersebut dan jadikan stiker
-                        const media = MessageMedia.fromFilePath(tempMp4Path);
+                        const media = MessageMedia.fromFilePath(tempWebpPath);
                         
                         await client.sendMessage(msg.from, media, { 
                             sendMediaAsSticker: true, 
@@ -86,17 +114,15 @@ module.exports = {
                         console.error('Error saat kirim:', sendErr);
                         msg.reply('❌ Gagal mengirim hasil stiker teks.');
                     } finally {
-                        // 4. Hapus file sementara untuk menghemat ruang server
                         if (fs.existsSync(tempGifPath)) fs.unlinkSync(tempGifPath);
-                        if (fs.existsSync(tempMp4Path)) fs.unlinkSync(tempMp4Path);
+                        if (fs.existsSync(tempWebpPath)) fs.unlinkSync(tempWebpPath);
                     }
                 })
                 .on('error', (err) => {
-                    console.error('Error proses convert MP4:', err);
+                    console.error('Error proses convert WEBP:', err);
                     msg.reply('❌ Gagal merender animasi video.');
-                    // Bersihkan file sementara jika error
                     if (fs.existsSync(tempGifPath)) fs.unlinkSync(tempGifPath);
-                    if (fs.existsSync(tempMp4Path)) fs.unlinkSync(tempMp4Path);
+                    if (fs.existsSync(tempWebpPath)) fs.unlinkSync(tempWebpPath);
                 });
 
         } catch (error) {
