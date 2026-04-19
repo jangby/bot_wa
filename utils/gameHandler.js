@@ -79,7 +79,9 @@ module.exports = async (client, msg) => {
         // 2. KUIS / TEBAK GAMBAR
         // ==========================================
         if (game.type === 'kuis' || game.type === 'tebakgambar') {
-            if (body === game.jawaban) {
+            // Kita gunakan 'includes' agar lebih fleksibel.
+            // Walaupun ada spasi lebih, di-reply, huruf besar kecil, tetap dianggap benar asal kata kuncinya ada.
+            if (body.includes(game.jawaban)) {
                 uang.addSaldo(senderId, game.hadiah);
                 await msg.reply(`🎉 *JAWABAN BENAR!* 🎉\n\nSelamat, jawabannya memang *${game.jawaban.toUpperCase()}*.\nKamu dapat hadiah: *${uang.formatRupiah(game.hadiah)}*`);
                 delete games[chatId]; 
