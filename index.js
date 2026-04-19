@@ -16,6 +16,31 @@ global.afkMap = new Map();
 global.afkBlacklist = new Map();
 global.afkWarnings = new Map();
 
+// --- SISTEM CACHE (MENCEGAH BOT LEMOT BACA FILE) ---
+const CACHE = {
+    settings: { bot_active: true, disabled_commands: [] },
+    blacklist: [],
+    antilink: [],
+    autobalas: [],
+    premium: {},
+    lastFetch: 0
+};
+
+// Fungsi untuk menarik data tanpa membuat lag
+const getCachedData = () => {
+    const now = Date.now();
+    // Update data dari file json setiap 30 detik saja, bukan setiap ada pesan masuk
+    if (now - CACHE.lastFetch > 30000) { 
+        try { CACHE.settings = fs.existsSync('./data/settings.json') ? JSON.parse(fs.readFileSync('./data/settings.json')) : CACHE.settings; } catch(e){}
+        try { CACHE.blacklist = fs.existsSync('./data/blacklist.json') ? JSON.parse(fs.readFileSync('./data/blacklist.json')) : CACHE.blacklist; } catch(e){}
+        try { CACHE.antilink = fs.existsSync('./data/antilink.json') ? JSON.parse(fs.readFileSync('./data/antilink.json')) : CACHE.antilink; } catch(e){}
+        try { CACHE.autobalas = fs.existsSync('./data/autobalas.json') ? JSON.parse(fs.readFileSync('./data/autobalas.json')) : CACHE.autobalas; } catch(e){}
+        try { CACHE.premium = fs.existsSync('./data/premium.json') ? JSON.parse(fs.readFileSync('./data/premium.json')) : CACHE.premium; } catch(e){}
+        CACHE.lastFetch = now;
+    }
+    return CACHE;
+};
+
 // --- INISIALISASI KATA KASAR ---
 const kataKasar = ['anjing', 'babi', 'monyet', 'kunyuk', 'bajingan', 'tolol', 'goblok', 'bangsat', 'kontol', 'memek', 'jembut']; 
 
@@ -81,8 +106,7 @@ client.on('message_create', async (msg) => {
         const isOwner = config.ownerNumber === senderId || config.sudoUsers.includes(senderId);
 
         // Load Settings (Bot On/Off)
-        const settingsPath = './data/settings.json';
-        let settings = { bot_active: true, disabled_commands: [] };
+        const settings = getCachedData().settings;
         if (fs.existsSync(settingsPath)) {
             settings = JSON.parse(fs.readFileSync(settingsPath));
         }
@@ -90,17 +114,11 @@ client.on('message_create', async (msg) => {
         // ==========================================
         // 🛡️ 1. CEK BLACKLIST PERMANEN (HAPUS PESAN & STOP)
         // ==========================================
-        const blPath = path.join(__dirname, './data/blacklist.json');
-        if (fs.existsSync(blPath)) {
-            const blacklist = JSON.parse(fs.readFileSync(blPath));
-            if (blacklist.includes(senderId)) {
-                try { 
-                    await msg.delete(true); 
-                    console.log(`[BLACKLIST] Pesan dihapus dari: ${senderId}`);
-                } catch (e) {} // Bot bukan admin, biarkan
-                return; // ⛔ STOP PROSES
-            }
-        }
+        const blacklist = getCachedData().blacklist;
+if (blacklist.includes(senderId)) {
+    try { await msg.delete(true); } catch (e) {} 
+    return; 
+}
 
         // ==========================================
         // 👮‍♂️ 2. SATPAM AFK & BLACKLIST SEMENTARA
@@ -281,7 +299,7 @@ client.on('message_create', async (msg) => {
                 // Anti Link Grup WA (Sistem Dinamis Per Grup)
                 const antilinkPath = path.join(__dirname, './data/antilink.json');
                 if (fs.existsSync(antilinkPath)) {
-                    const antilinkData = JSON.parse(fs.readFileSync(antilinkPath));
+                    const antilinkData = getCachedData().antilink;
                     
                     // Jika ID Grup ini ada di database antilink DAN pesannya mengandung link grup WA
                     if (antilinkData.includes(chat.id._serialized) && body.includes('chat.whatsapp.com/')) {
@@ -310,8 +328,8 @@ client.on('message_create', async (msg) => {
         // ==========================================
         // 🤖 7.5 AUTO-BALAS AI HANDLER
         // ==========================================
-        const autoBalasPath = path.join(__dirname, './data/autobalas.json');
-        if (fs.existsSync(autoBalasPath) && !body.startsWith('!')) {
+        const autoBalasUsers = getCachedData().autobalas;
+            if (autoBalasUsers.includes(senderId) && !msg.fromMe) {
             const autoBalasUsers = JSON.parse(fs.readFileSync(autoBalasPath));
             
             // Jika pengirim ada di daftar auto-balas DAN pesannya bukan dari bot sendiri
@@ -412,14 +430,10 @@ client.on('message_create', async (msg) => {
         const allowedDiPC = ['menu', 'daftarpremium', 'owner', 'premium', 'ww', 'izinkan', 'tolak', 'rekapizin'];
         
         if (!chat.isGroup && !isOwner && command.type !== 'general' && !allowedDiPC.includes(commandName)) {
-            const premPath = path.join(__dirname, './data/premium.json');
             let isPremium = false;
-            
-            if (fs.existsSync(premPath)) {
-                const premiumUsers = JSON.parse(fs.readFileSync(premPath));
-                const expDate = premiumUsers[senderId];
-                if (expDate && expDate > Date.now()) isPremium = true;
-            }
+const premiumUsers = getCachedData().premium;
+const expDate = premiumUsers[senderId];
+if (expDate && expDate > Date.now()) isPremium = true;
 
             if (!isPremium) {
                 return msg.reply(`⛔ *AKSES DITOLAK* ⛔\n\nFitur ini jika di Private Chat (PC) khusus member *PREMIUM*.\nKetik *!daftarpremium* untuk info berlangganan.`);
