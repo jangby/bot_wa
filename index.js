@@ -105,20 +105,17 @@ client.on('message_create', async (msg) => {
         // Cek Owner (Berdasarkan config.js)
         const isOwner = config.ownerNumber === senderId || config.sudoUsers.includes(senderId);
 
-        // Load Settings (Bot On/Off)
+        // Load Settings (Bot On/Off) Super Cepat dari Memori
         const settings = getCachedData().settings;
-        if (fs.existsSync(settingsPath)) {
-            settings = JSON.parse(fs.readFileSync(settingsPath));
-        }
 
         // ==========================================
         // 🛡️ 1. CEK BLACKLIST PERMANEN (HAPUS PESAN & STOP)
         // ==========================================
         const blacklist = getCachedData().blacklist;
-if (blacklist.includes(senderId)) {
-    try { await msg.delete(true); } catch (e) {} 
-    return; 
-}
+        if (blacklist.includes(senderId)) {
+            try { await msg.delete(true); } catch (e) {} 
+            return; 
+        }
 
         // ==========================================
         // 👮‍♂️ 2. SATPAM AFK & BLACKLIST SEMENTARA
@@ -248,13 +245,13 @@ if (blacklist.includes(senderId)) {
                         await msg.reply(`✅ *DONE*\nMasuk: ${uang.formatRupiah(nominal)}`);
                         await client.sendMessage(targetId, `🎉 *TOPUP SUKSES*\nSaldo masuk: ${uang.formatRupiah(nominal)}`);
 
-                        // 🔥 CETAK STRUK (Sekarang aman karena namaUser sudah ada)
+                        // 🔥 CETAK STRUK
                         try {
-                            const printer = require('./utils/printer'); // Pastikan path benar
+                            const printer = require('./utils/printer'); 
                             printer.printStruk({
                                 id: Date.now(),
                                 sender: targetId,
-                                pushname: namaUser,      // <--- Tidak error lagi
+                                pushname: namaUser,      
                                 item: "TOPUP SALDO BOT",
                                 nominal: uang.formatRupiah(nominal),
                                 status: "LUNAS / PAID"
@@ -297,20 +294,17 @@ if (blacklist.includes(senderId)) {
                 }
                 
                 // Anti Link Grup WA (Sistem Dinamis Per Grup)
-                const antilinkPath = path.join(__dirname, './data/antilink.json');
-                if (fs.existsSync(antilinkPath)) {
-                    const antilinkData = getCachedData().antilink;
-                    
-                    // Jika ID Grup ini ada di database antilink DAN pesannya mengandung link grup WA
-                    if (antilinkData.includes(chat.id._serialized) && body.includes('chat.whatsapp.com/')) {
-                        try {
-                            await msg.delete(true);
-                            await chat.sendMessage(`⚠️ @${contact.id.user} dilarang promosi link grup lain di sini!`, { mentions: [senderId] });
-                        } catch (err) {
-                            console.log('Gagal hapus link, pastikan bot adalah Admin');
-                        }
-                        return; // Stop proses agar command lain di bawahnya tidak tereksekusi
+                const antilinkData = getCachedData().antilink;
+                
+                // Jika ID Grup ini ada di database antilink DAN pesannya mengandung link grup WA
+                if (antilinkData.includes(chat.id._serialized) && body.includes('chat.whatsapp.com/')) {
+                    try {
+                        await msg.delete(true);
+                        await chat.sendMessage(`⚠️ @${contact.id.user} dilarang promosi link grup lain di sini!`, { mentions: [senderId] });
+                    } catch (err) {
+                        console.log('Gagal hapus link, pastikan bot adalah Admin');
                     }
+                    return; // Stop proses agar command lain di bawahnya tidak tereksekusi
                 }
 
                 // Anti Kata Kasar
@@ -318,7 +312,6 @@ if (blacklist.includes(senderId)) {
                     const words = body.toLowerCase().split(/ +/);
                     if (words.some(w => kataKasar.includes(w))) {
                         await msg.delete(true);
-                        // await chat.sendMessage(`⚠️ Jaga lisanmu @${contact.id.user}!`, { mentions: [senderId] });
                         return;
                     }
                 }
@@ -329,36 +322,33 @@ if (blacklist.includes(senderId)) {
         // 🤖 7.5 AUTO-BALAS AI HANDLER
         // ==========================================
         const autoBalasUsers = getCachedData().autobalas;
-            if (autoBalasUsers.includes(senderId) && !msg.fromMe) {
-            const autoBalasUsers = JSON.parse(fs.readFileSync(autoBalasPath));
-            
-            // Jika pengirim ada di daftar auto-balas DAN pesannya bukan dari bot sendiri
-            if (autoBalasUsers.includes(senderId) && !msg.fromMe) {
-                try {
-                    // Beri status "typing..." agar terlihat seperti manusia betulan
-                    await chat.sendStateTyping();
+        
+        // Jika pengirim ada di daftar auto-balas DAN pesannya bukan dari bot sendiri
+        if (autoBalasUsers.includes(senderId) && !msg.fromMe) {
+            try {
+                // Beri status "typing..." agar terlihat seperti manusia betulan
+                await chat.sendStateTyping();
 
-                    // Instruksi untuk Ollama agar menjadi gaul dan friendly
-                    const promptAI = `Kamu adalah teman ngobrol santai dari Indonesia. Bersikaplah sangat friendly, gaul, dan asik. Gunakan bahasa tongkrongan (seperti lo, gue, bro, sis, anjir, dll) tapi jangan kasar. Sesuaikan gaya bahasamu dengan chat lawan bicaramu. Balaslah chat berikut dengan natural dan seolah kamu manusia betulan:\n\n"${body}"`;
+                // Instruksi untuk Ollama agar menjadi gaul dan friendly
+                const promptAI = `Kamu adalah teman ngobrol santai dari Indonesia. Bersikaplah sangat friendly, gaul, dan asik. Gunakan bahasa tongkrongan (seperti lo, gue, bro, sis, anjir, dll) tapi jangan kasar. Sesuaikan gaya bahasamu dengan chat lawan bicaramu. Balaslah chat berikut dengan natural dan seolah kamu manusia betulan:\n\n"${body}"`;
 
-                    const response = await fetch('http://localhost:11434/api/generate', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            model: 'qwen2.5:1.5b', // Sesuaikan dengan modelmu
-                            prompt: promptAI,
-                            stream: false
-                        })
-                    });
+                const response = await fetch('http://localhost:11434/api/generate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        model: 'qwen2.5:1.5b', // Sesuaikan dengan modelmu
+                        prompt: promptAI,
+                        stream: false
+                    })
+                });
 
-                    if (response.ok) {
-                        const data = await response.json();
-                        await msg.reply(data.response);
-                    }
-                    return; // ⛔ PENTING: Stop di sini agar chat biasa tidak error saat masuk ke Command Handler bawahnya
-                } catch (error) {
-                    console.error('Auto-Balas Error:', error);
+                if (response.ok) {
+                    const data = await response.json();
+                    await msg.reply(data.response);
                 }
+                return; // ⛔ PENTING: Stop di sini agar chat biasa tidak error saat masuk ke Command Handler bawahnya
+            } catch (error) {
+                console.error('Auto-Balas Error:', error);
             }
         }
 
@@ -378,7 +368,6 @@ if (blacklist.includes(senderId)) {
                     await chat.sendStateTyping();
 
                     // Bersihkan teks dari tag bot agar AI fokus pada pertanyaannya
-                    // Contoh: "@628... halo bot" -> "halo bot"
                     const botNumber = client.info.wid.user; 
                     const cleanMessage = body.replace(new RegExp(`@${botNumber}`, 'g'), '').trim();
 
@@ -393,7 +382,7 @@ if (blacklist.includes(senderId)) {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
-                            model: 'qwen2.5:1.5b', // Kita pakai Qwen biar cepat dan pintar bahasa lokal
+                            model: 'qwen2.5:1.5b', 
                             prompt: promptAI,
                             stream: false
                         })
@@ -431,9 +420,9 @@ if (blacklist.includes(senderId)) {
         
         if (!chat.isGroup && !isOwner && command.type !== 'general' && !allowedDiPC.includes(commandName)) {
             let isPremium = false;
-const premiumUsers = getCachedData().premium;
-const expDate = premiumUsers[senderId];
-if (expDate && expDate > Date.now()) isPremium = true;
+            const premiumUsers = getCachedData().premium;
+            const expDate = premiumUsers[senderId];
+            if (expDate && expDate > Date.now()) isPremium = true;
 
             if (!isPremium) {
                 return msg.reply(`⛔ *AKSES DITOLAK* ⛔\n\nFitur ini jika di Private Chat (PC) khusus member *PREMIUM*.\nKetik *!daftarpremium* untuk info berlangganan.`);
@@ -444,7 +433,6 @@ if (expDate && expDate > Date.now()) isPremium = true;
         if (settings.disabled_commands.includes(commandName) && !isOwner) {
             return msg.reply('⚠️ Fitur ini sedang dimatikan Owner.');
         }
-
 
         // ==========================================
 
