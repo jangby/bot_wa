@@ -3,7 +3,7 @@ const { MessageMedia } = require('whatsapp-web.js');
 
 module.exports = {
     name: 'tts',
-    description: 'Ubah teks menjadi suara (Voice Note)',
+    description: 'Ubah teks menjadi suara (MP3)',
     type: 'general',
     async execute(client, msg, args) {
         let textToSpeak = '';
@@ -34,7 +34,6 @@ module.exports = {
             await msg.react('⏳');
 
             // 4. GENERATE AUDIO MENGGUNAKAN GOOGLE TTS API
-            // Karena di package.json kamu sudah ada "google-tts-api", kita gunakan getAudioBase64
             const base64Audio = await googleTTS.getAudioBase64(textToSpeak, {
                 lang: 'id', // Bahasa Indonesia
                 slow: false, // Kecepatan normal
@@ -45,10 +44,9 @@ module.exports = {
             // 5. UBAH KE FORMAT MEDIA WHATSAPP
             const media = new MessageMedia('audio/mp3', base64Audio, 'tts.mp3');
 
-            // 6. KIRIM SEBAGAI VOICE NOTE (VN)
-            await client.sendMessage(msg.from, media, { 
-                sendAudioAsVoice: true // Di-set true agar jadinya VN, bukan file MP3 biasa
-            });
+            // 6. KIRIM SEBAGAI AUDIO MP3 BIASA
+            // Parameter sendAudioAsVoice dihapus agar file tidak error di WhatsApp
+            await client.sendMessage(msg.from, media);
 
             await msg.react('✅');
 
