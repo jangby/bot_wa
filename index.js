@@ -207,6 +207,13 @@ client.on('message_create', async (msg) => {
             }
         }
 
+        // --- SISTEM LEVELING ---
+const lvlResult = levelSystem.addXp(senderId);
+if (lvlResult.leveledUp && lvlResult.announce) {
+    // Hanya mengirim pesan setiap naik 5 level
+    msg.reply(`🎊 *LEVEL UP!* 🎊\n\nSelamat @${contact.id.user}, kamu naik ke *Level ${lvlResult.level}*!\nPangkat: *${lvlResult.role}*`, { mentions: [senderId] });
+}
+
         // ==========================================
         // 🛑 4. CEK BOT MATI (Maintenance Mode)
         // ==========================================
