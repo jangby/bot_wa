@@ -1,34 +1,53 @@
-const fs = require('fs');
-const path = require('path');
+const db = require('./database');
 
-const dbPath = path.join(__dirname, '../data/level.json');
+// Memori RAM Sementara untuk Level & XP
+let dbLevel = {};
 
-// Helper Load/Save
-const loadDb = () => {
-    if (!fs.existsSync(dbPath)) fs.writeFileSync(dbPath, '{}');
-    return JSON.parse(fs.readFileSync(dbPath));
+// 1. LOAD DATA DARI DATABASE SAAT BOT NYALA
+const loadData = async () => {
+    try {
+        const [users] = await db.query('SELECT user_id, xp, level, last_msg FROM users');
+        users.forEach(u => {
+            dbLevel[u.user_id] = {
+                xp: Number(u.xp),
+                level: Number(u.level),
+                lastMsg: Number(u.last_msg)
+            };
+        });
+        console.log('✅ Data Level & XP sukses dimuat dari MariaDB!');
+    } catch (err) {
+        console.error('❌ Gagal load data Level:', err.message);
+    }
 };
-const saveDb = (data) => fs.writeFileSync(dbPath, JSON.stringify(data, null, 2));
+loadData();
+
+// 2. AUTO-SAVE KE DATABASE TIAP 30 DETIK DI LATAR BELAKANG
+setInterval(async () => {
+    try {
+        for (const [userId, data] of Object.entries(dbLevel)) {
+            // Update data XP dan Level, jika user belum ada maka akan dibuatkan otomatis
+            await db.query(
+                'INSERT INTO users (user_id, xp, level, last_msg) VALUES (?, ?, ?, ?) ON DUPLICATE KEY UPDATE xp = ?, level = ?, last_msg = ?',
+                [userId, data.xp, data.level, data.lastMsg, data.xp, data.level, data.lastMsg]
+            );
+        }
+    } catch (err) {
+        // Error disembunyikan agar log tidak spam
+    }
+}, 30000);
 
 module.exports = {
     // Fungsi Utama: Tambah XP
     addXp: (userId) => {
-        let db = loadDb();
-        
-        // Setup User Baru
-        if (!db[userId]) {
-            db[userId] = {
-                xp: 0,
-                level: 0,
-                lastMsg: 0
-            };
+        // Setup User Baru di RAM jika belum ada
+        if (!dbLevel[userId]) {
+            dbLevel[userId] = { xp: 0, level: 0, lastMsg: 0 };
         }
 
-        const user = db[userId];
+        const user = dbLevel[userId];
         const now = Date.now();
 
-        // COOLDOWN: Cek apakah sudah 1 menit (60000 ms) dari pesan terakhir?
-        // Agar tidak farming XP dengan spam
+        // COOLDOWN: Cek apakah sudah 1 menit dari pesan terakhir?
         if (now - user.lastMsg < 60000) {
             return { leveledUp: false, emoji: module.exports.getEmoji(user.level) }; 
         }
@@ -38,8 +57,7 @@ module.exports = {
         user.xp += xpGain;
         user.lastMsg = now;
 
-        // Hitung Level Baru (Setiap 100 XP = 1 Level)
-        // Rumus: Level = Math.floor(XP / 100)
+        // Hitung Level Baru
         const currentLevel = user.level;
         const newLevel = Math.floor(user.xp / 100);
 
@@ -51,9 +69,6 @@ module.exports = {
             leveledUp = true;
         }
 
-        saveDb(db);
-
-        // Kembalikan info untuk dipakai di index.js
         return {
             leveledUp: leveledUp,
             level: newLevel,
@@ -64,11 +79,11 @@ module.exports = {
 
     // Fungsi Ambil Emoji Berdasarkan Level
     getEmoji: (level) => {
-        if (level < 5) return '🗿';   // Level 0-4 (Newbie)
-        if (level < 20) return '🔥';  // Level 5-19 (Active)
-        if (level < 50) return '💎';  // Level 20-49 (Pro)
-        if (level < 100) return '👑'; // Level 50-99 (Sultan)
-        return '⚡';                  // Level 100+ (God)
+        if (level < 5) return '🥉';   
+        if (level < 20) return '🥈';  
+        if (level < 50) return '🥇';  
+        if (level < 100) return '💎'; 
+        return '👑';                  
     },
 
     // Fungsi Ambil Pangkat (Role Name)
@@ -80,20 +95,17 @@ module.exports = {
         return 'Dewa Admin';
     },
 
-    // Fungsi Ambil Data User
+    // Fungsi Ambil Data User (Instan dari RAM)
     getUser: (userId) => {
-        let db = loadDb();
-        if (!db[userId]) return { xp: 0, level: 0 };
-        return db[userId];
+        if (!dbLevel[userId]) return { xp: 0, level: 0 };
+        return dbLevel[userId];
     },
 
-    // Fungsi Leaderboard (Top 5)
+    // Fungsi Leaderboard (Top 10 Instan)
     getLeaderboard: () => {
-        let db = loadDb();
-        // Ubah object ke array, lalu sort berdasarkan XP tertinggi
-        return Object.entries(db)
+        return Object.entries(dbLevel)
             .map(([id, data]) => ({ id, ...data }))
             .sort((a, b) => b.xp - a.xp)
-            .slice(0, 10); // Ambil Top 10
+            .slice(0, 10);
     }
 };

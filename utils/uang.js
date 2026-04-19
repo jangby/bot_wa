@@ -1,48 +1,72 @@
-const fs = require('fs');
-const path = require('path');
+const db = require('./database'); // Memanggil jembatan MariaDB
 
-// Path Database
-const dbPath = path.join(__dirname, '../data/uang.json');
-const invPath = path.join(__dirname, '../data/inventory.json');
-const mutasiPath = path.join(__dirname, '../data/mutasi.json');
+// Memori RAM Sementara
+let dbUang = {};
+let dbInv = {};
 
-// 1. KITA LOAD DATA SEKALI SAJA SAAT BOT BARU NYALA
-let dbUang = fs.existsSync(dbPath) ? JSON.parse(fs.readFileSync(dbPath)) : {};
-let dbInv = fs.existsSync(invPath) ? JSON.parse(fs.readFileSync(invPath)) : {};
-let dbMutasi = fs.existsSync(mutasiPath) ? JSON.parse(fs.readFileSync(mutasiPath)) : {};
+// 1. LOAD DATA DARI DATABASE SAAT BOT NYALA
+const loadData = async () => {
+    try {
+        const [users] = await db.query('SELECT user_id, balance FROM users');
+        users.forEach(u => dbUang[u.user_id] = Number(u.balance));
 
-// 2. SISTEM AUTO-SAVE (MENCEGAH LAG)
-// Bot akan menyimpan perubahan ke file JSON setiap 30 detik di latar belakang
-setInterval(() => {
-    fs.writeFileSync(dbPath, JSON.stringify(dbUang, null, 2));
-    fs.writeFileSync(invPath, JSON.stringify(dbInv, null, 2));
-    fs.writeFileSync(mutasiPath, JSON.stringify(dbMutasi, null, 2));
-}, 30000); // 30000 ms = 30 detik
+        const [invs] = await db.query('SELECT user_id, item_name, quantity FROM inventories');
+        invs.forEach(i => {
+            if (!dbInv[i.user_id]) dbInv[i.user_id] = {};
+            dbInv[i.user_id][i.item_name] = Number(i.quantity);
+        });
+        console.log('✅ Data Ekonomi & Inventory sukses dimuat dari MariaDB!');
+    } catch (err) {
+        console.error('❌ Gagal load data MariaDB:', err.message);
+    }
+};
+loadData();
+
+// 2. AUTO-SAVE KE DATABASE TIAP 30 DETIK DI LATAR BELAKANG
+setInterval(async () => {
+    try {
+        // Simpan Uang
+        for (const [userId, balance] of Object.entries(dbUang)) {
+            await db.query(
+                'INSERT INTO users (user_id, balance) VALUES (?, ?) ON DUPLICATE KEY UPDATE balance = ?',
+                [userId, balance, balance]
+            );
+        }
+        // Simpan Inventory
+        for (const [userId, items] of Object.entries(dbInv)) {
+            for (const [itemName, qty] of Object.entries(items)) {
+                if (qty > 0) {
+                    await db.query(
+                        'INSERT INTO inventories (user_id, item_name, quantity) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE quantity = ?',
+                        [userId, itemName, qty, qty]
+                    );
+                } else {
+                    // Jika barang habis, hapus dari database
+                    await db.query('DELETE FROM inventories WHERE user_id = ? AND item_name = ?', [userId, itemName]);
+                }
+            }
+        }
+    } catch (err) {
+        // Error disembunyikan agar log tidak spam, tapi tetap berjalan
+    }
+}, 30000);
 
 // Fungsi Format Rupiah
 const formatRupiah = (angka) => {
     return 'Rp ' + angka.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ".");
 };
 
-// Fungsi Mencatat Mutasi
+// Fungsi Mencatat Mutasi Langsung ke Database (Fire and Forget)
 const catatMutasi = (userId, tipe, nominal, keterangan) => {
-    if (!dbMutasi[userId]) dbMutasi[userId] = [];
-
-    // Tambah ke memori, bukan ke file
-    dbMutasi[userId].unshift({
-        date: new Date().toLocaleString('id-ID'),
-        type: tipe,
-        amount: formatRupiah(nominal),
-        desc: keterangan || 'Transaksi Tanpa Keterangan'
-    });
-
-    if (dbMutasi[userId].length > 50) dbMutasi[userId].pop();
+    const tipeDB = tipe.includes('MASUK') ? 'MASUK' : 'KELUAR';
+    db.query('INSERT INTO mutasi_transaksi (user_id, type, amount, description) VALUES (?, ?, ?, ?)', [userId, tipeDB, nominal, keterangan])
+      .catch(err => console.error('Gagal catat mutasi:', err.message));
 };
 
 module.exports = {
     formatRupiah,
 
-    // Cek Saldo (Sangat Cepat karena ambil dari memori)
+    // Cek Saldo (Instan dari RAM)
     cekSaldo: (userId) => {
         return dbUang[userId] || 0;
     },
@@ -50,7 +74,7 @@ module.exports = {
     // Tambah Saldo
     addSaldo: (userId, amount, keterangan = 'Pendapatan Lain-lain') => {
         const saldoAwal = dbUang[userId] || 0;
-        dbUang[userId] = saldoAwal + amount; // Cuma ubah di memori
+        dbUang[userId] = saldoAwal + amount; 
         catatMutasi(userId, 'MASUK 🟢', amount, keterangan);
         return dbUang[userId];
     },
@@ -60,7 +84,7 @@ module.exports = {
         const saldoAwal = dbUang[userId] || 0;
         if (saldoAwal < amount) return false; 
 
-        dbUang[userId] = saldoAwal - amount; // Cuma ubah di memori
+        dbUang[userId] = saldoAwal - amount; 
         catatMutasi(userId, 'KELUAR 🔴', amount, keterangan);
         return true;
     },
