@@ -18,20 +18,20 @@ module.exports = {
             return msg.reply('❌ Bot harus dijadikan Admin Grup terlebih dahulu agar bisa menghapus pesan rahasiamu!');
         }
 
-        // 3. Deteksi Mention / Tag
+        // 3. Deteksi Mention / Tag dan pastikan ada pesan
         const mentions = await msg.getMentions();
-        if (mentions.length === 0) {
-            return msg.reply('❌ Caranya salah!\nFormat: *!menfess @orangnya pesan rahasiamu*');
+        
+        // Cek apakah ada tag DAN apakah ada argumen setelah tag
+        if (mentions.length === 0 || args.length < 2) {
+            return msg.reply('❌ Caranya salah!\nFormat: *!menfess @orangnya pesan rahasiamu*\nContoh: *!menfess @628123... semangat ya hari ini*');
         }
 
         const target = mentions[0];
         const targetId = target.id._serialized;
 
-        // 4. Ekstrak pesan murni
-        let pesanRahasia = msg.body;
-        pesanRahasia = pesanRahasia.replace(/!menfess/i, '');
-        pesanRahasia = pesanRahasia.replace(`@${target.number}`, '');
-        pesanRahasia = pesanRahasia.trim();
+        // 4. PERBAIKAN: Ekstrak pesan murni yang kebal angka acak
+        // args[0] berisi tag-nya. Maka kita ambil kata kedua (args[1]) dan seterusnya lalu gabungkan.
+        const pesanRahasia = args.slice(1).join(' ').trim();
 
         if (!pesanRahasia) {
             return msg.reply('❌ Kamu belum memasukkan pesan rahasianya!');
@@ -40,9 +40,6 @@ module.exports = {
         try {
             // 5. HAPUS PESAN PENGIRIM SEKARANG JUGA (Hapus Jejak)
             await msg.delete(true);
-
-            // Fitur notifikasi JAPRI dihapus untuk menghindari banned dari pihak Meta/WhatsApp.
-            // Bot akan bekerja murni di latar belakang (silently).
 
             // 6. PASANG TIMER 5 MENIT (300.000 milidetik)
             const waktuJeda = 5 * 60 * 1000; 
