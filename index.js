@@ -3,7 +3,7 @@ const qrcode = require('qrcode-terminal');
 const fs = require('fs');
 const path = require('path');
 const printer = require('./utils/printer');
-const activityTracker = require('./utils/activityTracker'); // Tracker aktivitas baru
+const activityTracker = require('./utils/activityTracker');
 
 // --- IMPORTS SENJATA KITA ---
 const config = require('./config');
@@ -23,6 +23,7 @@ const CACHE = {
     blacklist: [],
     antilink: [],
     autobalas: [],
+    except_groups: [], // Cache untuk grup yang dikecualikan dari auto-kick
     lastFetch: 0
 };
 
@@ -34,6 +35,7 @@ const getCachedData = () => {
         try { CACHE.blacklist = fs.existsSync('./data/blacklist.json') ? JSON.parse(fs.readFileSync('./data/blacklist.json')) : CACHE.blacklist; } catch(e){}
         try { CACHE.antilink = fs.existsSync('./data/antilink.json') ? JSON.parse(fs.readFileSync('./data/antilink.json')) : CACHE.antilink; } catch(e){}
         try { CACHE.autobalas = fs.existsSync('./data/autobalas.json') ? JSON.parse(fs.readFileSync('./data/autobalas.json')) : CACHE.autobalas; } catch(e){}
+        try { CACHE.except_groups = fs.existsSync('./data/except_groups.json') ? JSON.parse(fs.readFileSync('./data/except_groups.json')) : CACHE.except_groups; } catch(e){}
         CACHE.lastFetch = now;
     }
     return CACHE;
@@ -46,7 +48,7 @@ const client = new Client({
     authStrategy: new LocalAuth(),
     puppeteer: { 
         headless: true,
-        executablePath: '/usr/bin/chromium-browser', // Sesuaikan path ini jika di Ubuntu/Server
+        executablePath: '/usr/bin/chromium-browser',
         args: [
             '--no-sandbox', 
             '--disable-setuid-sandbox',
@@ -86,7 +88,6 @@ client.on('ready', () => {
 // 🔥 LOGIKA UTAMA (MESSAGE CREATE)
 // ==========================================
 client.on('message_create', async (msg) => {
-    // 📡 RADAR DETEKSI PESAN
     console.log(`[RADAR] Pesan dari: ${msg.from} | Isi: ${msg.body || '(Media/Sistem)'}`);
 
     try {
@@ -289,13 +290,21 @@ client.on('message_create', async (msg) => {
 });
 
 // ---------------------------------------------------------
-// ✅ AUTO-KICK MEMBER TIDAK AKTIF (7 HARI)
+// ✅ AUTO-KICK MEMBER TIDAK AKTIF (7 HARI) + PENGECUALIAN
 // ---------------------------------------------------------
 setInterval(async () => {
     console.log('🔍 [SISTEM] Pemindaian member hantu dimulai...');
     try {
         const inactiveUsers = await activityTracker.getInactiveMembers();
+        const exceptGroups = getCachedData().except_groups; // Ambil daftar pengecekan
+
         for (const user of inactiveUsers) {
+            // ✅ CEK APAKAH GRUP TERMASUK DALAM PENGECUALIAN
+            if (exceptGroups.includes(user.group_id)) {
+                console.log(`⏩ [SKIP] Grup ${user.group_id} dikecualikan dari pembersihan.`);
+                continue;
+            }
+
             try {
                 const chat = await client.getChatById(user.group_id);
                 const botPart = chat.participants.find(p => p.id._serialized === client.info.wid._serialized);
@@ -320,6 +329,6 @@ setInterval(async () => {
     } catch (err) {
         console.error(err);
     }
-}, 12 * 60 * 60 * 1000); // 12 Jam sekali
+}, 12 * 60 * 60 * 1000); // Jalan tiap 12 jam
 
 client.initialize();
