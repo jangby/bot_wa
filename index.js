@@ -22,7 +22,6 @@ const CACHE = {
     blacklist: [],
     antilink: [],
     autobalas: [],
-    premium: {},
     lastFetch: 0
 };
 
@@ -35,7 +34,6 @@ const getCachedData = () => {
         try { CACHE.blacklist = fs.existsSync('./data/blacklist.json') ? JSON.parse(fs.readFileSync('./data/blacklist.json')) : CACHE.blacklist; } catch(e){}
         try { CACHE.antilink = fs.existsSync('./data/antilink.json') ? JSON.parse(fs.readFileSync('./data/antilink.json')) : CACHE.antilink; } catch(e){}
         try { CACHE.autobalas = fs.existsSync('./data/autobalas.json') ? JSON.parse(fs.readFileSync('./data/autobalas.json')) : CACHE.autobalas; } catch(e){}
-        try { CACHE.premium = fs.existsSync('./data/premium.json') ? JSON.parse(fs.readFileSync('./data/premium.json')) : CACHE.premium; } catch(e){}
         CACHE.lastFetch = now;
     }
     return CACHE;
@@ -89,6 +87,9 @@ client.on('ready', () => {
 // 🔥 LOGIKA UTAMA (MESSAGE CREATE)
 // ==========================================
 client.on('message_create', async (msg) => {
+    // 📡 RADAR DETEKSI PESAN (Untuk memastikan bot tidak "tuli")
+    console.log(`[RADAR] Pesan dari: ${msg.from} | Isi: ${msg.body || '(Media/Sistem)'}`);
+
     try {
         // 0. FILTER DASAR (Abaikan Status & Newsletter)
         if (msg.from === 'status@broadcast') return;
@@ -227,27 +228,22 @@ client.on('message_create', async (msg) => {
                     if (idMatch && idMatch[1]) {
                         const targetId = idMatch[1];
 
-                        // --- PERBAIKAN DI SINI (DEFINISI NAMA USER) ---
-                        let namaUser = targetId; // Default pakai nomor HP dulu
+                        // Definisi Nama User
+                        let namaUser = targetId; 
                         try {
-                            // Coba ambil nama asli dari kontak WA
                             const contactTarget = await client.getContactById(targetId);
                             if (contactTarget && contactTarget.pushname) {
                                 namaUser = contactTarget.pushname;
                             }
-                        } catch (e) {
-                            // Kalau gagal ambil nama, biarkan tetap nomor HP
-                        }
-                        // ----------------------------------------------
+                        } catch (e) {}
 
-                        const saldoBaru = uang.addSaldo(targetId, nominal, 'Topup via Owner');
+                        uang.addSaldo(targetId, nominal, 'Topup via Owner');
                         
                         await msg.reply(`✅ *DONE*\nMasuk: ${uang.formatRupiah(nominal)}`);
                         await client.sendMessage(targetId, `🎉 *TOPUP SUKSES*\nSaldo masuk: ${uang.formatRupiah(nominal)}`);
 
                         // 🔥 CETAK STRUK
                         try {
-                            const printer = require('./utils/printer'); 
                             printer.printStruk({
                                 id: Date.now(),
                                 sender: targetId,
@@ -293,10 +289,8 @@ client.on('message_create', async (msg) => {
                     return;
                 }
                 
-                // Anti Link Grup WA (Sistem Dinamis Per Grup)
+                // Anti Link Grup WA
                 const antilinkData = getCachedData().antilink;
-                
-                // Jika ID Grup ini ada di database antilink DAN pesannya mengandung link grup WA
                 if (antilinkData.includes(chat.id._serialized) && body.includes('chat.whatsapp.com/')) {
                     try {
                         await msg.delete(true);
@@ -304,7 +298,7 @@ client.on('message_create', async (msg) => {
                     } catch (err) {
                         console.log('Gagal hapus link, pastikan bot adalah Admin');
                     }
-                    return; // Stop proses agar command lain di bawahnya tidak tereksekusi
+                    return;
                 }
 
                 // Anti Kata Kasar
@@ -326,17 +320,15 @@ client.on('message_create', async (msg) => {
         // Jika pengirim ada di daftar auto-balas DAN pesannya bukan dari bot sendiri
         if (autoBalasUsers.includes(senderId) && !msg.fromMe) {
             try {
-                // Beri status "typing..." agar terlihat seperti manusia betulan
                 await chat.sendStateTyping();
 
-                // Instruksi untuk Ollama agar menjadi gaul dan friendly
                 const promptAI = `Kamu adalah teman ngobrol santai dari Indonesia. Bersikaplah sangat friendly, gaul, dan asik. Gunakan bahasa tongkrongan (seperti lo, gue, bro, sis, anjir, dll) tapi jangan kasar. Sesuaikan gaya bahasamu dengan chat lawan bicaramu. Balaslah chat berikut dengan natural dan seolah kamu manusia betulan:\n\n"${body}"`;
 
                 const response = await fetch('http://localhost:11434/api/generate', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        model: 'qwen2.5:1.5b', // Sesuaikan dengan modelmu
+                        model: 'qwen2.5:1.5b', 
                         prompt: promptAI,
                         stream: false
                     })
@@ -346,7 +338,7 @@ client.on('message_create', async (msg) => {
                     const data = await response.json();
                     await msg.reply(data.response);
                 }
-                return; // ⛔ PENTING: Stop di sini agar chat biasa tidak error saat masuk ke Command Handler bawahnya
+                return;
             } catch (error) {
                 console.error('Auto-Balas Error:', error);
             }
@@ -359,23 +351,18 @@ client.on('message_create', async (msg) => {
             const botId = client.info.wid._serialized;
             const mentions = await msg.getMentions();
             
-            // Cek apakah di antara orang yang di-tag, ada ID bot kita
             const isBotMentioned = mentions.some(m => m.id._serialized === botId);
 
             if (isBotMentioned) {
                 try {
-                    // Biar kelihatan seperti manusia ngetik
                     await chat.sendStateTyping();
 
-                    // Bersihkan teks dari tag bot agar AI fokus pada pertanyaannya
                     const botNumber = client.info.wid.user; 
                     const cleanMessage = body.replace(new RegExp(`@${botNumber}`, 'g'), '').trim();
 
-                    // Coba ambil nama pengirim
                     let senderName = "Member";
                     try { senderName = contact.pushname || contact.name || "Member"; } catch (e) {}
 
-                    // Instruksi untuk Qwen
                     const promptAI = `Kamu adalah asisten virtual grup WhatsApp yang asik, ramah, dan gaul. Seseorang bernama ${senderName} baru saja me-mention/memanggilmu di grup dengan pesan berikut:\n\n"${cleanMessage}"\n\nBalaslah pesannya dengan natural. Gunakan bahasa Indonesia yang santai (lo-gue, bro, sis) tapi sopan. Jangan terlalu panjang:`;
 
                     const response = await fetch('http://localhost:11434/api/generate', {
@@ -390,10 +377,9 @@ client.on('message_create', async (msg) => {
 
                     if (response.ok) {
                         const data = await response.json();
-                        // Balas pesan dan mention balik orang yang manggil
                         await msg.reply(data.response, chat.id._serialized, { mentions: [contact] });
                     }
-                    return; // ⛔ STOP di sini agar tidak tabrakan dengan proses lain
+                    return;
                 } catch (error) {
                     console.error('Error saat merespon mention:', error);
                 }
@@ -403,28 +389,25 @@ client.on('message_create', async (msg) => {
         // ==========================================
         // ⚙️ 8. COMMAND HANDLER (Prefix !)
         // ==========================================
-        if (!body.startsWith('!')) return; // Hanya respon yg depannya !
+        if (!body.startsWith('!')) return;
 
         const args = body.slice(1).trim().split(/\s+/);
         const commandName = args.shift().toLowerCase();
 
-        if (!client.commands.has(commandName)) return; // Command gak dikenal
+        if (!client.commands.has(commandName)) return;
 
         const command = client.commands.get(commandName);
 
         // ==========================================
         // 👑 PINDAHAN CEK PREMIUM (GATEKEEPER PC)
         // ==========================================
-        // Jika chat di PC, bukan Owner, dan fitur tersebut BUKAN bertipe 'general'
         const allowedDiPC = ['menu', 'daftarpremium', 'owner', 'premium', 'ww', 'izinkan', 'tolak', 'rekapizin'];
         
         if (!chat.isGroup && !isOwner && command.type !== 'general' && !allowedDiPC.includes(commandName)) {
-            let isPremium = false;
-            const premiumUsers = getCachedData().premium;
-            const expDate = premiumUsers[senderId];
-            if (expDate && expDate > Date.now()) isPremium = true;
-
-            if (!isPremium) {
+            // PERBAIKAN: Menggunakan fungsi MariaDB dari premiumHandler
+            const limitStatus = premiumHandler.getLimitStatus(senderId, isOwner);
+            
+            if (limitStatus.status !== 'PREMIUM' && limitStatus.status !== 'OWNER') {
                 return msg.reply(`⛔ *AKSES DITOLAK* ⛔\n\nFitur ini jika di Private Chat (PC) khusus member *PREMIUM*.\nKetik *!daftarpremium* untuk info berlangganan.`);
             }
         }
@@ -433,8 +416,6 @@ client.on('message_create', async (msg) => {
         if (settings.disabled_commands.includes(commandName) && !isOwner) {
             return msg.reply('⚠️ Fitur ini sedang dimatikan Owner.');
         }
-
-        // ==========================================
 
         // Cek Admin Grup
         let isAdmin = false;
