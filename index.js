@@ -3,6 +3,7 @@ const qrcode = require('qrcode-terminal');
 const fs = require('fs');
 const path = require('path');
 const printer = require('./utils/printer');
+const activityTracker = require('./utils/activityTracker'); // Tracker aktivitas baru
 
 // --- IMPORTS SENJATA KITA ---
 const config = require('./config');
@@ -28,7 +29,6 @@ const CACHE = {
 // Fungsi untuk menarik data tanpa membuat lag
 const getCachedData = () => {
     const now = Date.now();
-    // Update data dari file json setiap 30 detik saja, bukan setiap ada pesan masuk
     if (now - CACHE.lastFetch > 30000) { 
         try { CACHE.settings = fs.existsSync('./data/settings.json') ? JSON.parse(fs.readFileSync('./data/settings.json')) : CACHE.settings; } catch(e){}
         try { CACHE.blacklist = fs.existsSync('./data/blacklist.json') ? JSON.parse(fs.readFileSync('./data/blacklist.json')) : CACHE.blacklist; } catch(e){}
@@ -46,8 +46,7 @@ const client = new Client({
     authStrategy: new LocalAuth(),
     puppeteer: { 
         headless: true,
-        // ARAHKAN KE GOOGLE CHROME LAPTOP KAMU
-        executablePath: '/usr/bin/chromium-browser',
+        executablePath: '/usr/bin/chromium-browser', // Sesuaikan path ini jika di Ubuntu/Server
         args: [
             '--no-sandbox', 
             '--disable-setuid-sandbox',
@@ -87,70 +86,56 @@ client.on('ready', () => {
 // 🔥 LOGIKA UTAMA (MESSAGE CREATE)
 // ==========================================
 client.on('message_create', async (msg) => {
-    // 📡 RADAR DETEKSI PESAN (Untuk memastikan bot tidak "tuli")
+    // 📡 RADAR DETEKSI PESAN
     console.log(`[RADAR] Pesan dari: ${msg.from} | Isi: ${msg.body || '(Media/Sistem)'}`);
 
     try {
-        // 0. FILTER DASAR (Abaikan Status & Newsletter)
         if (msg.from === 'status@broadcast') return;
         if (msg.from.includes('@newsletter')) return;
 
-        // Ambil Data Chat & Contact dengan Aman
         let chat;
         try { chat = await msg.getChat(); } catch (e) { return; }
         
         const contact = await msg.getContact();
-        const body = msg.body || ''; // Fallback aman jika pesan berupa gambar tanpa caption
-        const senderId = contact.id._serialized; // ID Pengirim (User)
-        
-        // Cek Owner (Berdasarkan config.js)
+        const body = msg.body || ''; 
+        const senderId = contact.id._serialized; 
         const isOwner = config.ownerNumber === senderId || config.sudoUsers.includes(senderId);
 
-        // Load Settings (Bot On/Off) Super Cepat dari Memori
+        // ---------------------------------------------------------
+        // ✅ PENCATATAN AKTIVITAS (Untuk Auto-Kick)
+        // ---------------------------------------------------------
+        if (chat.isGroup && !msg.fromMe) {
+            await activityTracker.recordActivity(senderId, chat.id._serialized);
+        }
+
         const settings = getCachedData().settings;
 
-        // ==========================================
-        // 🛡️ 1. CEK BLACKLIST PERMANEN (HAPUS PESAN & STOP)
-        // ==========================================
+        // 🛡️ 1. CEK BLACKLIST PERMANEN
         const blacklist = getCachedData().blacklist;
         if (blacklist.includes(senderId)) {
             try { await msg.delete(true); } catch (e) {} 
             return; 
         }
 
-        // ==========================================
         // 👮‍♂️ 2. SATPAM AFK & BLACKLIST SEMENTARA
-        // ==========================================
         if (!msg.fromMe) {
-            
-            // A. Cek Blacklist Sementara AFK (HUKUMAN: HAPUS PESAN AKTIF)
             if (global.afkBlacklist.has(senderId)) {
                 if (Date.now() < global.afkBlacklist.get(senderId)) {
-                    // Sedang dalam masa hukuman -> HAPUS PESANNYA
-                    try {
-                        await msg.delete(true); 
-                    } catch (err) {
-                        console.log('Gagal hapus pesan AFK, pastikan Bot adalah Admin Grup!');
-                    }
-                    return; // ⛔ STOP PROSES
+                    try { await msg.delete(true); } catch (err) {}
+                    return; 
                 } else {
-                    // Waktu habis tapi belum sempat terhapus oleh setTimeout (Fallback aman)
                     global.afkBlacklist.delete(senderId); 
                     global.afkWarnings.delete(senderId);
                 }
             }
 
-            // B. Cabut status AFK jika orang tersebut mengirim pesan
             if (global.afkMap.has(senderId)) {
                 global.afkMap.delete(senderId);
                 msg.reply(`👋 Selamat datang kembali! Status AFK kamu telah dicabut.`);
             }
 
-            // C. Cek Pelanggaran: Apakah dia tag/reply orang yang sedang AFK?
             if (chat.isGroup) {
                 let taggedAfkUser = null;
-
-                // Deteksi Reply
                 if (msg.hasQuotedMsg) {
                     const quoted = await msg.getQuotedMessage();
                     const quotedId = quoted.author || quoted.from;
@@ -159,7 +144,6 @@ client.on('message_create', async (msg) => {
                     }
                 }
 
-                // Deteksi Tag/Mention (@)
                 if (!taggedAfkUser && msg.mentionedIds && msg.mentionedIds.length > 0) {
                     for (let id of msg.mentionedIds) {
                         if (global.afkMap.has(id)) {
@@ -169,149 +153,81 @@ client.on('message_create', async (msg) => {
                     }
                 }
 
-                // Jika terbukti melanggar (Tag/Reply orang AFK)
                 if (taggedAfkUser && taggedAfkUser.id !== senderId) {
-                    
-                    // Ambil jumlah pelanggaran saat ini, tambah 1
                     let currentWarnings = global.afkWarnings.get(senderId) || 0;
                     currentWarnings += 1;
                     global.afkWarnings.set(senderId, currentWarnings);
-
                     const reason = taggedAfkUser.data.reason;
 
-                    // CEK APAKAH SUDAH MENCAPAI 3 KALI PELANGGARAN
                     if (currentWarnings >= 3) {
-                        const banDuration = 5 * 60 * 1000; // 5 Menit
-
-                        // Masukkan ke blacklist
+                        const banDuration = 5 * 60 * 1000;
                         global.afkBlacklist.set(senderId, Date.now() + banDuration);
-                        
-                        // Kirim pesan eksekusi hukuman
-                        await msg.reply(`🚨 *HUKUMAN SISTEM* 🚨\n\nKamu telah mengabaikan peringatan sebanyak 3 kali.\n\n_Semua pesan yang kamu kirim di grup ini akan otomatis dihapus oleh bot selama 5 menit ke depan!_`);
-
-                        // Buat timer otomatis untuk mengabari jika hukuman selesai
+                        await msg.reply(`🚨 *HUKUMAN SISTEM*\nKamu tag/reply orang AFK 3x. Pesanmu akan dihapus otomatis selama 5 menit.`);
                         setTimeout(async () => {
                             global.afkBlacklist.delete(senderId);
-                            global.afkWarnings.delete(senderId); // Reset dosa jadi 0
-                            
+                            global.afkWarnings.delete(senderId);
                             try {
-                                await client.sendMessage(chat.id._serialized, `✅ @${contact.id.user}, masa hukuman AFK-mu telah berakhir. Kamu sudah bisa mengirim pesan lagi dengan normal.`, { mentions: [senderId] });
+                                await client.sendMessage(chat.id._serialized, `✅ @${contact.id.user}, hukuman AFK-mu berakhir.`, { mentions: [senderId] });
                             } catch (e) {}
                         }, banDuration);
-
                     } else {
-                        // Jika masih 1 atau 2 kali pelanggaran, beri peringatan
-                        return msg.reply(`⚠️ *PERINGATAN (${currentWarnings}/3)* ⚠️\n\nJangan tag atau balas pesan dia! Orang tersebut sedang AFK.\n*Alasan:* ${reason}\n\n_Peringatan ke-3 akan mengakibatkan pesanmu dibisukan otomatis selama 5 menit._`);
+                        return msg.reply(`⚠️ *PERINGATAN (${currentWarnings}/3)*\nJangan ganggu orang AFK! Alasan: ${reason}`);
                     }
                 }
             }
         }
 
         // --- SISTEM LEVELING ---
-const lvlResult = levelSystem.addXp(senderId);
-if (lvlResult.leveledUp && lvlResult.announce) {
-    // Hanya mengirim pesan setiap naik 5 level
-    msg.reply(`🎊 *LEVEL UP!* 🎊\n\nSelamat @${contact.id.user}, kamu naik ke *Level ${lvlResult.level}*!\nPangkat: *${lvlResult.role}*`, { mentions: [senderId] });
-}
+        const lvlResult = levelSystem.addXp(senderId);
+        if (lvlResult.leveledUp && lvlResult.announce) {
+            msg.reply(`🎊 *LEVEL UP!* 🎊\n\nSelamat @${contact.id.user}, naik ke *Level ${lvlResult.level}*!`, { mentions: [senderId] });
+        }
 
-        // ==========================================
-        // 🛑 4. CEK BOT MATI (Maintenance Mode)
-        // ==========================================
+        // 🛑 4. MAINTENANCE MODE
         if (!settings.bot_active && body.toLowerCase() !== '!on' && !isOwner) return;
 
-        // ==========================================
-        // 💰 5. LOGIKA TOPUP OWNER (Manual ACC)
-        // ==========================================
+        // 💰 5. TOPUP OWNER
         if (isOwner && msg.hasQuotedMsg && body.toLowerCase().startsWith('ya ')) {
             const quotedMsg = await msg.getQuotedMessage();
             const content = quotedMsg.caption || quotedMsg.body || '';
-
-            if (content.includes('REQUEST TOPUP') && content.includes('ID:')) {
-                const argsTopup = body.trim().split(/\s+/);
-                const nominal = parseInt(argsTopup[1]);
-
-                if (!isNaN(nominal)) {
-                    const idMatch = content.match(/ID: (\S+)/);
-                    if (idMatch && idMatch[1]) {
-                        const targetId = idMatch[1];
-
-                        // Definisi Nama User
-                        let namaUser = targetId; 
-                        try {
-                            const contactTarget = await client.getContactById(targetId);
-                            if (contactTarget && contactTarget.pushname) {
-                                namaUser = contactTarget.pushname;
-                            }
-                        } catch (e) {}
-
-                        uang.addSaldo(targetId, nominal, 'Topup via Owner');
-                        
-                        await msg.reply(`✅ *DONE*\nMasuk: ${uang.formatRupiah(nominal)}`);
-                        await client.sendMessage(targetId, `🎉 *TOPUP SUKSES*\nSaldo masuk: ${uang.formatRupiah(nominal)}`);
-
-                        // 🔥 CETAK STRUK
-                        try {
-                            printer.printStruk({
-                                id: Date.now(),
-                                sender: targetId,
-                                pushname: namaUser,      
-                                item: "TOPUP SALDO BOT",
-                                nominal: uang.formatRupiah(nominal),
-                                status: "LUNAS / PAID"
-                            });
-                        } catch (errPrint) {
-                            console.log('Gagal Print:', errPrint.message);
-                        }
-
-                        return;
-                    }
+            if (content.includes('REQUEST TOPUP')) {
+                const nominal = parseInt(body.trim().split(/\s+/)[1]);
+                const idMatch = content.match(/ID: (\S+)/);
+                if (!isNaN(nominal) && idMatch) {
+                    const targetId = idMatch[1];
+                    uang.addSaldo(targetId, nominal, 'Topup via Owner');
+                    await msg.reply(`✅ *DONE*\nMasuk: ${uang.formatRupiah(nominal)}`);
+                    try {
+                        printer.printStruk({ id: Date.now(), sender: targetId, pushname: "User", item: "TOPUP", nominal: uang.formatRupiah(nominal), status: "PAID" });
+                    } catch (e) {}
+                    return;
                 }
             }
         }
 
-        // ==========================================
-        // 🎮 6. GAME HANDLER (Kuis, TTT, Adu Ayam)
-        // ==========================================
-        // Handle input game (tanpa prefix !)
+        // 🎮 6. GAME HANDLER
         if (await gameHandler(client, msg)) return;
 
-        // ==========================================
-        // 🛡️ 7. KEAMANAN GRUP (Anti-Link, Virtex, Kasar)
-        // ==========================================
+        // 🛡️ 7. KEAMANAN GRUP
         if (chat.isGroup) {
             const participant = chat.participants.find(p => p.id._serialized === senderId);
             const isSenderAdmin = participant ? (participant.isAdmin || participant.isSuperAdmin) : false;
-            
-            const botId = client.info.wid._serialized;
-            const botPart = chat.participants.find(p => p.id._serialized === botId);
+            const botPart = chat.participants.find(p => p.id._serialized === client.info.wid._serialized);
             const isBotAdmin = botPart && (botPart.isAdmin || botPart.isSuperAdmin);
 
-            // Jika Pengirim BUKAN Admin & BUKAN Owner, tapi Bot ADMIN
             if (!isSenderAdmin && !isOwner && isBotAdmin) {
-                
-                // Anti Virtex
                 if (!settings.disabled_commands.includes('antivirtex') && body.length > 5000) {
                     await msg.delete(true);
                     await chat.removeParticipants([senderId]);
                     return;
                 }
-                
-                // Anti Link Grup WA
                 const antilinkData = getCachedData().antilink;
                 if (antilinkData.includes(chat.id._serialized) && body.includes('chat.whatsapp.com/')) {
-                    try {
-                        await msg.delete(true);
-                        await chat.sendMessage(`⚠️ @${contact.id.user} dilarang promosi link grup lain di sini!`, { mentions: [senderId] });
-                    } catch (err) {
-                        console.log('Gagal hapus link, pastikan bot adalah Admin');
-                    }
+                    await msg.delete(true);
                     return;
                 }
-
-                // Anti Kata Kasar
                 if (!settings.disabled_commands.includes('antikasar')) {
-                    const words = body.toLowerCase().split(/ +/);
-                    if (words.some(w => kataKasar.includes(w))) {
+                    if (kataKasar.some(w => body.toLowerCase().includes(w))) {
                         await msg.delete(true);
                         return;
                     }
@@ -319,129 +235,91 @@ if (lvlResult.leveledUp && lvlResult.announce) {
             }
         }
 
-        // ==========================================
-        // 🤖 7.5 AUTO-BALAS AI HANDLER
-        // ==========================================
+        // 🤖 7.5 AUTO-BALAS AI
         const autoBalasUsers = getCachedData().autobalas;
-        
-        // Jika pengirim ada di daftar auto-balas DAN pesannya bukan dari bot sendiri
         if (autoBalasUsers.includes(senderId) && !msg.fromMe) {
             try {
                 await chat.sendStateTyping();
-
-                const promptAI = `Kamu adalah teman ngobrol santai dari Indonesia. Bersikaplah sangat friendly, gaul, dan asik. Gunakan bahasa tongkrongan (seperti lo, gue, bro, sis, anjir, dll) tapi jangan kasar. Sesuaikan gaya bahasamu dengan chat lawan bicaramu. Balaslah chat berikut dengan natural dan seolah kamu manusia betulan:\n\n"${body}"`;
-
                 const response = await fetch('http://localhost:11434/api/generate', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        model: 'qwen2.5:1.5b', 
-                        prompt: promptAI,
-                        stream: false
-                    })
+                    body: JSON.stringify({ model: 'qwen2.5:1.5b', prompt: body, stream: false })
                 });
-
                 if (response.ok) {
                     const data = await response.json();
                     await msg.reply(data.response);
                 }
                 return;
-            } catch (error) {
-                console.error('Auto-Balas Error:', error);
-            }
+            } catch (e) {}
         }
 
-        // ==========================================
-        // 🤖 7.6 AUTO-BALAS JIKA BOT DI-TAG (MENTION)
-        // ==========================================
-        if (chat.isGroup && !msg.fromMe && !body.startsWith('!')) {
-            const botId = client.info.wid._serialized;
-            const mentions = await msg.getMentions();
-            
-            const isBotMentioned = mentions.some(m => m.id._serialized === botId);
-
-            if (isBotMentioned) {
-                try {
-                    await chat.sendStateTyping();
-
-                    const botNumber = client.info.wid.user; 
-                    const cleanMessage = body.replace(new RegExp(`@${botNumber}`, 'g'), '').trim();
-
-                    let senderName = "Member";
-                    try { senderName = contact.pushname || contact.name || "Member"; } catch (e) {}
-
-                    const promptAI = `Kamu adalah asisten virtual grup WhatsApp yang asik, ramah, dan gaul. Seseorang bernama ${senderName} baru saja me-mention/memanggilmu di grup dengan pesan berikut:\n\n"${cleanMessage}"\n\nBalaslah pesannya dengan natural. Gunakan bahasa Indonesia yang santai (lo-gue, bro, sis) tapi sopan. Jangan terlalu panjang:`;
-
-                    const response = await fetch('http://localhost:11434/api/generate', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            model: 'qwen2.5:1.5b', 
-                            prompt: promptAI,
-                            stream: false
-                        })
-                    });
-
-                    if (response.ok) {
-                        const data = await response.json();
-                        await msg.reply(data.response, chat.id._serialized, { mentions: [contact] });
-                    }
-                    return;
-                } catch (error) {
-                    console.error('Error saat merespon mention:', error);
-                }
-            }
-        }
-
-        // ==========================================
-        // ⚙️ 8. COMMAND HANDLER (Prefix !)
-        // ==========================================
+        // ⚙️ 8. COMMAND HANDLER
         if (!body.startsWith('!')) return;
-
         const args = body.slice(1).trim().split(/\s+/);
         const commandName = args.shift().toLowerCase();
-
         if (!client.commands.has(commandName)) return;
 
         const command = client.commands.get(commandName);
 
-        // ==========================================
-        // 👑 PINDAHAN CEK PREMIUM (GATEKEEPER PC)
-        // ==========================================
-        const allowedDiPC = ['menu', 'daftarpremium', 'owner', 'premium', 'ww', 'izinkan', 'tolak', 'rekapizin'];
-        
-        if (!chat.isGroup && !isOwner && command.type !== 'general' && !allowedDiPC.includes(commandName)) {
-            // PERBAIKAN: Menggunakan fungsi MariaDB dari premiumHandler
+        // 👑 PREMIUM CHECK
+        const allowedDiPC = ['menu', 'daftarpremium', 'owner', 'premium'];
+        if (!chat.isGroup && !isOwner && !allowedDiPC.includes(commandName)) {
             const limitStatus = premiumHandler.getLimitStatus(senderId, isOwner);
-            
             if (limitStatus.status !== 'PREMIUM' && limitStatus.status !== 'OWNER') {
-                return msg.reply(`⛔ *AKSES DITOLAK* ⛔\n\nFitur ini jika di Private Chat (PC) khusus member *PREMIUM*.\nKetik *!daftarpremium* untuk info berlangganan.`);
+                return msg.reply(`⛔ Fitur PC khusus member *PREMIUM*.`);
             }
         }
 
-        // Cek Disable Fitur (Global)
-        if (settings.disabled_commands.includes(commandName) && !isOwner) {
-            return msg.reply('⚠️ Fitur ini sedang dimatikan Owner.');
-        }
-
-        // Cek Admin Grup
+        // Cek Admin Grup untuk perintah admin
         let isAdmin = false;
         if (chat.isGroup) {
-            const participant = chat.participants.find(p => p.id._serialized === senderId);
-            isAdmin = participant ? (participant.isAdmin || participant.isSuperAdmin) : false;
+            const p = chat.participants.find(p => p.id._serialized === senderId);
+            isAdmin = p ? (p.isAdmin || p.isSuperAdmin) : false;
         }
 
-        // Eksekusi Command
         try {
             await command.execute(client, msg, args, { chat, contact, isOwner, isAdmin });
         } catch (err) {
-            console.error(`Error execute ${commandName}:`, err);
-            msg.reply('❌ Terjadi kesalahan pada sistem bot.');
+            console.error(err);
         }
 
     } catch (e) {
         console.error('CRITICAL ERROR:', e);
     }
 });
+
+// ---------------------------------------------------------
+// ✅ AUTO-KICK MEMBER TIDAK AKTIF (7 HARI)
+// ---------------------------------------------------------
+setInterval(async () => {
+    console.log('🔍 [SISTEM] Pemindaian member hantu dimulai...');
+    try {
+        const inactiveUsers = await activityTracker.getInactiveMembers();
+        for (const user of inactiveUsers) {
+            try {
+                const chat = await client.getChatById(user.group_id);
+                const botPart = chat.participants.find(p => p.id._serialized === client.info.wid._serialized);
+                
+                if (botPart && (botPart.isAdmin || botPart.isSuperAdmin)) {
+                    const participant = chat.participants.find(p => p.id._serialized === user.user_id);
+                    if (!participant) {
+                        await activityTracker.removeRecord(user.user_id, user.group_id);
+                        continue;
+                    }
+                    
+                    if (!participant.isAdmin && config.ownerNumber !== user.user_id) {
+                        await chat.sendMessage(`👻 *AUTO-KICK*\n@${user.user_id.split('@')[0]} dikeluarkan karena tidak chat > 7 hari.`, { mentions: [user.user_id] });
+                        await chat.removeParticipants([user.user_id]);
+                        await activityTracker.removeRecord(user.user_id, user.group_id);
+                    }
+                }
+            } catch (e) {
+                await activityTracker.removeRecord(user.user_id, user.group_id);
+            }
+        }
+    } catch (err) {
+        console.error(err);
+    }
+}, 12 * 60 * 60 * 1000); // 12 Jam sekali
 
 client.initialize();
