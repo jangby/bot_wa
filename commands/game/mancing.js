@@ -14,10 +14,10 @@ module.exports = {
         // 1. Cek Apakah Punya Pancingan?
         const inventory = uang.cekInventory(userId);
         if (!inventory['pancingan'] || inventory['pancingan'] < 1) {
-            return msg.reply('❌ Kamu gak punya *Pancingan*! Beli dulu di *!toko* seharga 25k.');
+            return msg.reply('❌ Kamu gak punya *Pancingan*! Beli dulu di *!toko*.');
         }
 
-        // 2. Cek Cooldown (Tetap 5 Detik biar cepat kaya)
+        // 2. Cek Cooldown (Tetap 5 Detik)
         if (!fs.existsSync(cdPath)) fs.writeFileSync(cdPath, '{}');
         let cooldowns = {};
         try {
@@ -37,58 +37,56 @@ module.exports = {
         fs.writeFileSync(cdPath, JSON.stringify(cooldowns, null, 2));
 
         // 3. Proses Gacha (Visual Cepat 1 Detik)
-        await msg.reply('🎣 *Melempar kail...*');
+        await msg.reply('🎣 *Melempar kail ke lautan luas...*');
         await new Promise(r => setTimeout(r, 1000));
 
         const chance = Math.random() * 100; // 0 - 100
 
         // SKENARIO 1: PANCINGAN PATAH (5%)
-        // Resiko tetap ada biar deg-degan, tapi kecil (1 dari 20 kali mancing)
         if (chance < 5) {
             uang.useItem(userId, 'pancingan');
-            return msg.reply('💥 *KRETEK!* Apes banget! Pancinganmu nyangkut di batu dan PATAH.\n(Item hilang, beli lagi sana).');
+            return msg.reply('💥 *KRETEK!* Apes banget! Kailmu disambar monster laut dan pancinganmu PATAH.\n(Item hilang, beli lagi di toko).');
         }
 
-        // SKENARIO 2: ZONK (15%) - DIKURANGI BIAR GAK STRES
+        // SKENARIO 2: ZONK (15%)
         if (chance < 20) {
-            const sampah = ['Sepatu Butut', 'Popok Bayi', 'Kaleng Bekas', 'Ranting Pohon', 'Celana Dalam'];
+            const sampah = ['Sepatu Bot Butut', 'Ban Bekas', 'Plastik Kresek', 'Ranting Basah', 'Jaring Rusak'];
             const item = sampah[Math.floor(Math.random() * sampah.length)];
             return msg.reply(`👢 *ZONK!* Kamu cuma dapat *${item}*. Buang aja.`);
         }
 
-        // SKENARIO 3: IKAN BIASA (40%) - HARGA NAIK (3k - 8k)
-        if (chance < 60) {
-            const listIkan = ['Ikan Lele', 'Ikan Mas', 'Ikan Mujair', 'Ikan Nila', 'Ikan Sapu-sapu'];
+        // SKENARIO 3: IKAN KONSUMSI / BIASA (50%) -> HARGA REALISTIS (Rp 25.000 - Rp 150.000)
+        if (chance < 70) {
+            const listIkan = ['Ikan Gurame Besar', 'Ikan Mas Koki', 'Ikan Kakap Merah', 'Ikan Kerapu', 'Ikan Bandeng', 'Cumi-Cumi Segar'];
             const ikan = listIkan[Math.floor(Math.random() * listIkan.length)];
             
-            // Harga Baru: 3000 sampai 8000
-            const harga = Math.floor(Math.random() * 5000) + 3000; 
+            // Random antara 25.000 sampai 150.000
+            const harga = Math.floor(Math.random() * 125000) + 25000; 
 
             uang.addSaldo(userId, harga, `Mancing: ${ikan}`);
-            return msg.reply(`🐟 *LUMAYAN!* Dapat *${ikan}*.\nLaku dijual: *${uang.formatRupiah(harga)}*`);
+            return msg.reply(`🐟 *LUMAYAN!* Dapat *${ikan}*.\nLangsung laku dijual di pasar ikan seharga: *${uang.formatRupiah(harga)}*`);
         }
 
-        // SKENARIO 4: IKAN LANGKA (35%) - HARGA NAIK (10k - 25k) & CHANCE NAIK
-        // Peluang dapat rare sekarang lebih besar (35%)
+        // SKENARIO 4: IKAN PREMIUM / LANGKA (25%) -> HARGA JUTAAN (Rp 800.000 - Rp 8.000.000)
         if (chance < 95) {
-            const listIkan = ['Ikan Hiu', 'Ikan Paus', 'Cumi Raksasa', 'Kepiting Raja', 'Arwana Golden', 'Lobster'];
+            const listIkan = ['Tuna Sirip Biru (Bluefin)', 'Arwana Super Red', 'Lobster Raksasa Mutiara', 'Kepiting Raja Alaska', 'Ikan Pari Manta Langka'];
             const ikan = listIkan[Math.floor(Math.random() * listIkan.length)];
             
-            // Harga Baru: 10.000 sampai 25.000
-            const harga = Math.floor(Math.random() * 15000) + 10000;
+            // Random antara 800.000 sampai 8.000.000
+            const harga = Math.floor(Math.random() * 7200000) + 800000;
 
             uang.addSaldo(userId, harga, `Mancing Rare: ${ikan}`);
-            return msg.reply(`🦈 *MANTAAP!* Tangkapan besar! Dapat *${ikan}*!\nBandar bayar mahal: *${uang.formatRupiah(harga)}*`);
+            return msg.reply(`🦈 *MANTAAP!* Tangkapan sultan! Kamu berhasil menarik *${ikan}*!\nKolektor berani bayar mahal: *${uang.formatRupiah(harga)}*`);
         }
 
-        // SKENARIO 5: LEGENDARY / HARTA KARUN (5%) - HARGA SULTAN (50k - 100k)
-        const listHarta = ['Peti Emas', 'Mutiara Hitam', 'Kalung Berlian', 'Mahkota Raja', 'iPhone 15 Pro Max'];
+        // SKENARIO 5: HARTA KARUN / LEGENDARY (5%) -> HARGA PULUHAN JUTA (Rp 15.000.000 - Rp 85.000.000)
+        const listHarta = ['Peti Emas Peninggalan VOC', 'Mutiara Hitam Langka', 'Cincin Berlian Kuno', 'Bongkahan Emas Murni', 'Jam Tangan Rolex Tenggelam'];
         const harta = listHarta[Math.floor(Math.random() * listHarta.length)];
         
-        // Harga Baru: 50.000 sampai 100.000
-        const harga = Math.floor(Math.random() * 50000) + 50000;
+        // Random antara 15.000.000 sampai 85.000.000
+        const harga = Math.floor(Math.random() * 70000000) + 15000000;
 
         uang.addSaldo(userId, harga, `Mancing Jackpot: ${harta}`);
-        return msg.reply(`💎 *JACKPOT GILA!!!* Kailmu menyangkut di *${harta}*!\nKamu mendadak kaya: *${uang.formatRupiah(harga)}*`);
+        return msg.reply(`💎 *JACKPOT GILA!!!* Kailmu menyangkut sesuatu yang berat... Ternyata itu *${harta}*!\nKamu mendadak jadi miliarder setelah menjualnya seharga: *${uang.formatRupiah(harga)}* 🤑`);
     }
 };
