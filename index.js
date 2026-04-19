@@ -278,11 +278,21 @@ client.on('message_create', async (msg) => {
                     return;
                 }
                 
-                // Anti Link Grup WA
-                if (!settings.disabled_commands.includes('antilink') && body.includes('chat.whatsapp.com/')) {
-                    await msg.delete(true);
-                    await chat.sendMessage(`⚠️ @${contact.id.user} dilarang kirim link grup!`, { mentions: [senderId] });
-                    return;
+                // Anti Link Grup WA (Sistem Dinamis Per Grup)
+                const antilinkPath = path.join(__dirname, './data/antilink.json');
+                if (fs.existsSync(antilinkPath)) {
+                    const antilinkData = JSON.parse(fs.readFileSync(antilinkPath));
+                    
+                    // Jika ID Grup ini ada di database antilink DAN pesannya mengandung link grup WA
+                    if (antilinkData.includes(chat.id._serialized) && body.includes('chat.whatsapp.com/')) {
+                        try {
+                            await msg.delete(true);
+                            await chat.sendMessage(`⚠️ @${contact.id.user} dilarang promosi link grup lain di sini!`, { mentions: [senderId] });
+                        } catch (err) {
+                            console.log('Gagal hapus link, pastikan bot adalah Admin');
+                        }
+                        return; // Stop proses agar command lain di bawahnya tidak tereksekusi
+                    }
                 }
 
                 // Anti Kata Kasar
