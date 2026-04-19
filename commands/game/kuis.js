@@ -2,27 +2,31 @@ const bankSoal = require('../../data/bankSoal');
 
 module.exports = {
     name: 'kuis',
-    description: 'Kuis pengetahuan umum berhadiah',
+    description: 'Kuis pengetahuan umum 10 sesi dengan pendaftaran',
     async execute(client, msg, args, { chat }) {
         if (!chat.isGroup) return msg.reply('❌ Main di grup biar seru!');
         if (client.gameStates[chat.id._serialized]) return msg.reply('⚠️ Masih ada game berjalan di grup ini!');
 
-        const soal = bankSoal[Math.floor(Math.random() * bankSoal.length)];
-        
+        // Inisialisasi Lobby Kuis
         client.gameStates[chat.id._serialized] = {
-            type: 'kuis',
-            jawaban: soal.jawaban.toLowerCase(),
-            hadiah: 2000 // Rp 2.000
+            type: 'kuis_lobby',
+            players: [],
+            scores: {}, // Untuk mencatat perolehan uang pemain
+            questionCount: 0,
+            maxQuestions: 10,
+            currentJawaban: '',
+            currentHadiah: 0
         };
 
-        msg.reply(`🧠 *KUIS BERHADIAH* 🧠\n\n${soal.soal}\n\n💰 Hadiah: *Rp 2.000*\n⏳ Waktu: 60 Detik`);
+        const aturan = `🧠 *KUIS BERHADIAH (10 SESI)* 🧠\n\n` +
+                       `*Aturan Main:*\n` +
+                       `1. Pemain wajib daftar dengan ketik *!join kuis*.\n` +
+                       `2. Hanya pendaftar yang bisa menjawab.\n` +
+                       `3. Ada 10 pertanyaan, yang paling cepat menjawab benar akan dapat saldo.\n` +
+                       `4. Hadiah acak *Rp 5.000 - Rp 15.000* per soal.\n\n` +
+                       `Silahkan bergabung! Minimal 1 orang untuk memulai.\n` +
+                       `Ketik *!start* untuk memulai kuis.`;
 
-        // Timer Habis
-        setTimeout(() => {
-            if (client.gameStates[chat.id._serialized] && client.gameStates[chat.id._serialized].type === 'kuis') {
-                client.sendMessage(chat.id._serialized, `⏰ Waktu habis! Jawabannya: *${soal.jawaban}*`);
-                delete client.gameStates[chat.id._serialized];
-            }
-        }, 60000);
+        msg.reply(aturan);
     }
 };

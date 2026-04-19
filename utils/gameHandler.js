@@ -1,4 +1,5 @@
 const uang = require('./uang');
+const bankSoal = require('../data/bankSoal');
 
 // Helper Delay
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -76,18 +77,75 @@ module.exports = async (client, msg) => {
         }
 
         // ==========================================
-        // 2. KUIS / TEBAK GAMBAR
-        // ==========================================
-        if (game.type === 'kuis' || game.type === 'tebakgambar') {
-            // Kita gunakan 'includes' agar lebih fleksibel.
-            // Walaupun ada spasi lebih, di-reply, huruf besar kecil, tetap dianggap benar asal kata kuncinya ada.
-            if (body.includes(game.jawaban)) {
-                uang.addSaldo(senderId, game.hadiah);
-                await msg.reply(`🎉 *JAWABAN BENAR!* 🎉\n\nSelamat, jawabannya memang *${game.jawaban.toUpperCase()}*.\nKamu dapat hadiah: *${uang.formatRupiah(game.hadiah)}*`);
-                delete games[chatId]; 
-                return true; 
-            }
+// 2. KUIS MULTI-SESI (UPDATE)
+// ==========================================
+
+// --- FASE LOBBY (PENDAFTARAN) ---
+if (game.type === 'kuis_lobby') {
+    if (body === '!join kuis') {
+        if (game.players.includes(senderId)) return msg.reply('❌ Kamu sudah terdaftar.');
+        game.players.push(senderId);
+        game.scores[senderId] = 0; // Inisialisasi saldo sesi ini
+        await msg.reply(`✅ @${senderId.split('@')[0]} bergabung! Total: ${game.players.length} pemain.`, { mentions: [senderId] });
+        return true;
+    }
+
+    if (body === '!start') {
+        if (game.players.length < 1) return msg.reply('❌ Minimal harus ada 1 orang yang bergabung!');
+        if (!game.players.includes(senderId)) return msg.reply('❌ Hanya pemain yang terdaftar yang bisa memulai.');
+
+        game.type = 'kuis_active';
+        return startKuisSession(client, chatId, game); // Panggil fungsi mulai soal
+    }
+}
+
+// --- FASE PERMAINAN BERLANGSUNG ---
+if (game.type === 'kuis_active') {
+    // Cek apakah pengirim adalah pemain terdaftar
+    if (!game.players.includes(senderId)) return false; 
+
+    if (body.includes(game.currentJawaban)) {
+        const hadiah = Math.floor(Math.random() * (15000 - 5000 + 1)) + 5000; // Rentang 5k - 15k
+        game.scores[senderId] += hadiah;
+        uang.addSaldo(senderId, hadiah, 'Menang Kuis');
+
+        await msg.reply(`🎉 *BENAR!* (+${uang.formatRupiah(hadiah)})\n\n@${senderId.split('@')[0]} menjawab: *${game.currentJawaban.toUpperCase()}*`, { mentions: [senderId] });
+        
+        game.questionCount++;
+
+        // Cek apakah sudah 10 soal
+        if (game.questionCount >= game.maxQuestions) {
+            let resultMsg = `🏁 *KUIS SELESAI* 🏁\n\nBerikut perolehan saldo total sesi ini:\n`;
+            
+            // Urutkan skor tertinggi
+            const sortedPlayers = Object.entries(game.scores).sort((a, b) => b[1] - a[1]);
+            sortedPlayers.forEach(([pid, score], i) => {
+                resultMsg += `${i + 1}. @${pid.split('@')[0]} : *${uang.formatRupiah(score)}*\n`;
+            });
+
+            await client.sendMessage(chatId, resultMsg, { mentions: game.players });
+            delete client.gameStates[chatId];
+        } else {
+            // Lanjut soal berikutnya
+            await delay(2000);
+            return startKuisSession(client, chatId, game);
         }
+        return true;
+    }
+}
+
+// Fungsi Helper untuk mengirim soal (Taruh di luar atau di atas gameHandler)
+async function startKuisSession(client, chatId, game) {
+    const soal = bankSoal[Math.floor(Math.random() * bankSoal.length)];
+    game.currentJawaban = soal.jawaban.toLowerCase();
+    
+    const teks = `❓ *PERTANYAAN KE ${game.questionCount + 1}/${game.maxQuestions}* ❓\n\n` +
+                 `${soal.soal}\n\n` +
+                 `⏳ Jawab sekarang! (Hanya untuk pemain terdaftar)`;
+    
+    await client.sendMessage(chatId, teks);
+    return true;
+}
 
         // ==========================================
         // 3. SAMBUNG KATA
