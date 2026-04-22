@@ -16,6 +16,7 @@ const premiumHandler = require('./utils/premiumHandler'); // (Modul dipertahanka
 global.afkMap = new Map();
 global.afkBlacklist = new Map();
 global.afkWarnings = new Map();
+global.bookingSessions = new Map();
 
 // --- SISTEM CACHE (MENCEGAH BOT LEMOT BACA FILE) ---
 const CACHE = {
@@ -123,6 +124,66 @@ client.on('message_create', async (msg) => {
                                 `📱 *DANA / QRIS:* (Silakan scan gambar di atas)\n\n` +
                                 `Jika sudah transfer, mohon kirimkan *FOTO BUKTI TRANSFER* di obrolan ini ya. Kami akan segera memprosesnya.`;
                 return client.sendMessage(msg.from, qrisMedia, { caption: teksBayar });
+            }
+        }
+        // ---------------------------------------------------------
+
+        // ---------------------------------------------------------
+        // 💬 SISTEM PEMESANAN INTERAKTIF VIA CHAT WA
+        // ---------------------------------------------------------
+        if (!msg.fromMe && global.bookingSessions.has(senderId)) {
+            const session = global.bookingSessions.get(senderId);
+            const text = bodyLower.trim();
+
+            // Fitur untuk membatalkan pesanan di tengah jalan
+            if (text === 'batal') {
+                global.bookingSessions.delete(senderId);
+                return msg.reply('❌ Proses pemesanan dibatalkan.');
+            }
+
+            // Logika tanya jawab berdasarkan langkah (step)
+            switch (session.step) {
+                case 1:
+                    if (text === '1') { session.mobil = 'Innova Reborn'; session.harga = 'Rp 850.000'; }
+                    else if (text === '2') { session.mobil = 'Avanza Veloz'; session.harga = 'Rp 450.000'; }
+                    else if (text === '3') { session.mobil = 'Hiace Commuter'; session.harga = 'Rp 1.200.000'; }
+                    else return msg.reply('⚠️ Pilihan tidak valid. Balas dengan angka *1, 2, atau 3*. (Ketik *batal* untuk membatalkan)');
+                    
+                    session.step = 2;
+                    global.bookingSessions.set(senderId, session);
+                    return msg.reply(`✅ Anda memilih *${session.mobil}*.\n\nSelanjutnya, mohon masukkan *Nama Lengkap* Anda:`);
+                    
+                case 2:
+                    session.nama = body.trim();
+                    session.step = 3;
+                    global.bookingSessions.set(senderId, session);
+                    return msg.reply(`Halo Kak *${session.nama}*, untuk kapan rencana sewanya?\n\nBalas dengan format tanggal (Contoh: *25 April 2026*):`);
+                    
+                case 3:
+                    session.tanggal = body.trim();
+                    session.step = 4;
+                    global.bookingSessions.set(senderId, session);
+                    return msg.reply(`Berapa lama durasi penyewaannya?\n\nBalas dengan angka harinya saja (Contoh: *2* untuk 2 Hari):`);
+                    
+                case 4:
+                    session.durasi = body.trim();
+                    session.step = 5;
+                    global.bookingSessions.set(senderId, session);
+                    return msg.reply(`Terakhir, di mana titik penjemputannya / pengiriman mobilnya?\n\n(Contoh: *Stasiun Garut* atau *Alamat Rumah*):`);
+                    
+                case 5:
+                    session.lokasi = body.trim();
+                    global.bookingSessions.delete(senderId); // Hapus sesi karena sudah selesai
+                    
+                    let konfirmasi = `*📝 RINGKASAN PESANAN ANDA*\n\n` +
+                                     `🚘 *Armada:* ${session.mobil}\n` +
+                                     `💵 *Harga:* ${session.harga} /hari\n` +
+                                     `👤 *Pemesan:* ${session.nama}\n` +
+                                     `📅 *Tanggal:* ${session.tanggal}\n` +
+                                     `⏱️ *Durasi:* ${session.durasi} Hari\n` +
+                                     `📍 *Titik Jemput:* ${session.lokasi}\n\n` +
+                                     `Apakah data di atas sudah benar? Ketik *DEAL* untuk menyelesaikan pesanan dan mendapatkan info pembayaran.`;
+                    return msg.reply(konfirmasi);
             }
         }
         // ---------------------------------------------------------
