@@ -10,7 +10,7 @@ const config = require('./config');
 const uang = require('./utils/uang');
 const gameHandler = require('./utils/gameHandler');
 const levelSystem = require('./utils/level');       // Logika Leveling
-const premiumHandler = require('./utils/premiumHandler'); // Logika Limit & Premium
+const premiumHandler = require('./utils/premiumHandler'); // (Modul dipertahankan, tapi limit sudah dinonaktifkan)
 
 // Deklarasi memori untuk fitur AFK dan Blacklist sementara
 global.afkMap = new Map();
@@ -99,8 +99,33 @@ client.on('message_create', async (msg) => {
         
         const contact = await msg.getContact();
         const body = msg.body || ''; 
+        const bodyLower = body.toLowerCase();
         const senderId = contact.id._serialized; 
         const isOwner = config.ownerNumber === senderId || config.sudoUsers.includes(senderId);
+
+        // ---------------------------------------------------------
+        // 🛒 INTEGRASI WEB BERKAH TRANSPORT (AUTO-REPLY PESANAN)
+        // ---------------------------------------------------------
+        if (!msg.fromMe) {
+            // 1. Terima formulir pesanan
+            if (bodyLower.includes('halo admin *berkah transport')) {
+                let balasan = `Halo Kak! Terima kasih telah menghubungi Berkah Transport City Garut. 🚘\n\n` +
+                              `Pesanan Anda sudah kami terima dan unit tersedia. Apakah datanya sudah sesuai dan ingin lanjut ke proses pembayaran?\n\n` +
+                              `Ketik *DEAL* untuk melanjutkan transaksi, atau ketik *!tanya [pertanyaan]* jika ada yang ingin didiskusikan dengan admin.`;
+                return msg.reply(balasan);
+            }
+
+            // 2. Proses Deal & Kirim QRIS
+            if (bodyLower === 'deal') {
+                const qrisMedia = MessageMedia.fromFilePath('./qr_dana.jpeg'); 
+                let teksBayar = `Bagus! Silakan lakukan pembayaran DP (minimal 50%) atau Lunas ke rekening berikut untuk mengamankan jadwal pesanan Anda:\n\n` +
+                                `💳 *BCA:* 1234567890 a.n Berkah Transport\n` +
+                                `📱 *DANA / QRIS:* (Silakan scan gambar di atas)\n\n` +
+                                `Jika sudah transfer, mohon kirimkan *FOTO BUKTI TRANSFER* di obrolan ini ya. Kami akan segera memprosesnya.`;
+                return client.sendMessage(msg.from, qrisMedia, { caption: teksBayar });
+            }
+        }
+        // ---------------------------------------------------------
 
         // ---------------------------------------------------------
         // ✅ PENCATATAN AKTIVITAS (Untuk Auto-Kick)
@@ -262,14 +287,8 @@ client.on('message_create', async (msg) => {
 
         const command = client.commands.get(commandName);
 
-        // 👑 PREMIUM CHECK
-        const allowedDiPC = ['menu', 'daftarpremium', 'owner', 'premium'];
-        if (!chat.isGroup && !isOwner && !allowedDiPC.includes(commandName)) {
-            const limitStatus = premiumHandler.getLimitStatus(senderId, isOwner);
-            if (limitStatus.status !== 'PREMIUM' && limitStatus.status !== 'OWNER') {
-                return msg.reply(`⛔ Fitur PC khusus member *PREMIUM*.`);
-            }
-        }
+        // 🔓 SISTEM LIMIT TELAH DIHAPUS 
+        // Semua fitur kini dapat diakses secara penuh tanpa batas limit per hari.
 
         // Cek Admin Grup untuk perintah admin
         let isAdmin = false;
