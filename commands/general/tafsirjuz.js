@@ -26,7 +26,7 @@ module.exports = {
         // 9 = Tafsir Al-Jalalayn (Indonesia)
         // 169 = Tafsir Ibn Kathir (English)
         const tafsirId = lang === 'id' ? '9' : '169';
-        const langName = lang === 'id' ? 'Indonesia (Al-Jalalayn)' : 'English (Ibn Kathir)';
+        const langName = lang === 'id' ? 'Indonesia (Kemenag)' : 'English (Ibn Kathir)';
 
         const loadingMsg = await msg.reply(`⏳ Sedang menyusun dokumen Tafsir Juz ${juz}...\nKitab: *${langName}*\n\n_(Mohon tunggu sebentar, bot sedang mengambil data tafsir per-ayat. Ini akan memakan waktu sekitar 15-30 detik)_`);
         await msg.react('⏳');
@@ -78,24 +78,29 @@ module.exports = {
                     const [surahNum, ayahNum] = arab.verse_key.split(':');
                     
                     if (lang === 'id') {
-                        // Mengambil Tafsir Wajiz Kemenag RI (Bukan cuma terjemahan)
-                        const resId = await fetch(`https://quranapi.idn.sch.id/tafsir/${surahNum}/${ayahNum}`);
+                        // Mengambil Tafsir dari API Equran.id (Sangat Stabil)
+                        const resId = await fetch(`https://equran.id/api/v2/tafsir/${surahNum}`);
                         const jsonId = await resId.json();
                         
-                        // Mengambil teks tafsirnya
-                        if (jsonId.tafsir) {
-                            tafsirText = jsonId.tafsir;
+                        // Cari ayat yang sesuai di dalam array tafsir
+                        const dataAyat = jsonId.data.tafsir.find(t => t.ayat == ayahNum);
+                        if (dataAyat) {
+                            tafsirText = dataAyat.teks;
                         }
                     } else {
-                        // Jika Inggris, tetap gunakan Ibn Kathir
+                        // Jika Inggris, tetap gunakan Ibn Kathir dari Quran.com
                         const tafsirRes = await fetch(`https://api.quran.com/api/v4/tafsirs/169/by_ayah/${arab.verse_key}`);
                         const tafsirJson = await tafsirRes.json();
                         if (tafsirJson.tafsir) {
                             tafsirText = tafsirJson.tafsir.text.replace(/<[^>]+>/g, '').trim();
                         }
                     }
+
+                    // Tambahkan sedikit jeda 100ms agar tidak terkena rate limit server
+                    await new Promise(resolve => setTimeout(resolve, 100));
+
                 } catch (err) {
-                    console.error(`Gagal mengambil tafsir untuk ayat ${arab.verse_key}`);
+                    console.error(`Gagal mengambil tafsir untuk ayat ${arab.verse_key}:`, err.message);
                 }
 
                 // Header Penanda Ayat
