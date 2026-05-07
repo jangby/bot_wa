@@ -22,9 +22,11 @@ module.exports = {
             lang = args[1].toLowerCase();
         }
 
-        // 169 = Tafsir Kemenag (Indonesia), 168 = Tafsir Ibn Kathir (English)
-        const tafsirId = lang === 'id' ? '169' : '168';
-        const langName = lang === 'id' ? 'Indonesia (Kemenag)' : 'English (Ibn Kathir)';
+        // PERBAIKAN DI SINI:
+        // 9 = Tafsir Al-Jalalayn (Indonesia)
+        // 169 = Tafsir Ibn Kathir (English)
+        const tafsirId = lang === 'id' ? '9' : '169';
+        const langName = lang === 'id' ? 'Indonesia (Al-Jalalayn)' : 'English (Ibn Kathir)';
 
         const loadingMsg = await msg.reply(`⏳ Sedang menyusun dokumen Tafsir Juz ${juz}...\nKitab: *${langName}*\n\n_(Mohon tunggu sebentar, bot sedang mengambil data tafsir per-ayat. Ini akan memakan waktu sekitar 15-30 detik)_`);
         await msg.react('⏳');
