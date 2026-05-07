@@ -70,22 +70,27 @@ module.exports = {
                 spacing: { after: 600 }
             }));
 
-            // 2. Looping per ayat untuk mengambil teks Tafsir secara spesifik
+            // 2. Looping per ayat untuk mengambil teks Tafsir
             for (const arab of allVerses) {
                 let tafsirText = "Tafsir tidak tersedia untuk ayat ini.";
                 
                 try {
-                    // Menggunakan endpoint khusus Tafsir By Ayah (Sangat Akurat)
-                    const tafsirRes = await fetch(`https://api.quran.com/api/v4/tafsirs/${tafsirId}/by_ayah/${arab.verse_key}`);
-                    const tafsirJson = await tafsirRes.json();
-
-                    if (tafsirJson && tafsirJson.tafsir && tafsirJson.tafsir.text) {
-                        tafsirText = tafsirJson.tafsir.text
-                            .replace(/<[^>]+>/g, '')       // Hapus tag HTML
-                            .replace(/&quot;/g, '"')       // Bersihkan simbol quote
-                            .replace(/&nbsp;/g, ' ')       // Bersihkan simbol spasi
-                            .replace(/\n\s*\n/g, '\n\n')   // Rapikan enter
-                            .trim();
+                    // Kita gunakan API Kemenag yang lebih lengkap untuk Bahasa Indonesia
+                    // Format verse_key adalah "surah:ayat", kita ubah jadi "surah/ayat"
+                    const [surahNum, ayahNum] = arab.verse_key.split(':');
+                    
+                    if (lang === 'id') {
+                        // Mengambil Tafsir Kemenag (Wajiz)
+                        const resId = await fetch(`https://quranenc.com/api/v1/translation/aya/indonesian_sabiq/${surahNum}/${ayahNum}`);
+                        const jsonId = await resId.json();
+                        tafsirText = jsonId.result.translation; // Ini berisi teks tafsir/terjemahan mendalam
+                    } else {
+                        // Jika Inggris, tetap gunakan Ibn Kathir dari Quran.com
+                        const tafsirRes = await fetch(`https://api.quran.com/api/v4/tafsirs/169/by_ayah/${arab.verse_key}`);
+                        const tafsirJson = await tafsirRes.json();
+                        if (tafsirJson.tafsir) {
+                            tafsirText = tafsirJson.tafsir.text.replace(/<[^>]+>/g, '').trim();
+                        }
                     }
                 } catch (err) {
                     console.error(`Gagal mengambil tafsir untuk ayat ${arab.verse_key}`);
