@@ -75,17 +75,19 @@ module.exports = {
                 let tafsirText = "Tafsir tidak tersedia untuk ayat ini.";
                 
                 try {
-                    // Kita gunakan API Kemenag yang lebih lengkap untuk Bahasa Indonesia
-                    // Format verse_key adalah "surah:ayat", kita ubah jadi "surah/ayat"
                     const [surahNum, ayahNum] = arab.verse_key.split(':');
                     
                     if (lang === 'id') {
-                        // Mengambil Tafsir Kemenag (Wajiz)
-                        const resId = await fetch(`https://quranenc.com/api/v1/translation/aya/indonesian_sabiq/${surahNum}/${ayahNum}`);
+                        // Mengambil Tafsir Wajiz Kemenag RI (Bukan cuma terjemahan)
+                        const resId = await fetch(`https://quranapi.idn.sch.id/tafsir/${surahNum}/${ayahNum}`);
                         const jsonId = await resId.json();
-                        tafsirText = jsonId.result.translation; // Ini berisi teks tafsir/terjemahan mendalam
+                        
+                        // Mengambil teks tafsirnya
+                        if (jsonId.tafsir) {
+                            tafsirText = jsonId.tafsir;
+                        }
                     } else {
-                        // Jika Inggris, tetap gunakan Ibn Kathir dari Quran.com
+                        // Jika Inggris, tetap gunakan Ibn Kathir
                         const tafsirRes = await fetch(`https://api.quran.com/api/v4/tafsirs/169/by_ayah/${arab.verse_key}`);
                         const tafsirJson = await tafsirRes.json();
                         if (tafsirJson.tafsir) {
